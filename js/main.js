@@ -4,6 +4,8 @@ import { SpotifyAuth } from './spotify.js';
 
 // DOM Elements
 const canvas = document.getElementById('visualizerCanvas');
+const systemAudioBtn = document.getElementById('systemAudioBtn');
+const systemAudioLabel = document.getElementById('systemAudioLabel');
 const audioFileInput = document.getElementById('audioFileInput');
 const micBtn = document.getElementById('micBtn');
 const micLabel = document.getElementById('micLabel');
@@ -53,7 +55,33 @@ function animate() {
 }
 requestAnimationFrame(animate);
 
-// 1. File Input Handler
+// Reset UI toggle buttons
+function resetActiveButtons() {
+  systemAudioBtn.classList.remove('active');
+  systemAudioLabel.textContent = "System-Audio";
+  micBtn.classList.remove('active');
+  micLabel.textContent = "Mikrofon";
+  demoBtn.classList.remove('active');
+}
+
+// 1. System Audio Capture (getDisplayMedia)
+systemAudioBtn.addEventListener('click', async () => {
+  if (audioEngine.currentMode === 'system') {
+    audioEngine.disconnectCurrent();
+    resetActiveButtons();
+    trackTitle.textContent = "Gestoppt";
+    trackArtist.textContent = "Kein Audio aktiv";
+  } else {
+    const success = await audioEngine.startSystemAudio();
+    if (success) {
+      resetActiveButtons();
+      systemAudioBtn.classList.add('active');
+      systemAudioLabel.textContent = "Streamt Live";
+    }
+  }
+});
+
+// 2. Local File Input Handler
 audioFileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (file) {
@@ -62,12 +90,11 @@ audioFileInput.addEventListener('change', (e) => {
   }
 });
 
-// 2. Microphone / Live Audio Input
+// 3. Microphone / Live Room Audio Input
 micBtn.addEventListener('click', async () => {
   if (audioEngine.currentMode === 'mic') {
     audioEngine.disconnectCurrent();
-    micBtn.classList.remove('active');
-    micLabel.textContent = "Mikrofon";
+    resetActiveButtons();
     trackTitle.textContent = "Gestoppt";
     trackArtist.textContent = "Kein Audio aktiv";
   } else {
@@ -80,11 +107,11 @@ micBtn.addEventListener('click', async () => {
   }
 });
 
-// 3. Trap Beat Demo
+// 4. Trap Beat Demo Loop
 demoBtn.addEventListener('click', () => {
   if (audioEngine.currentMode === 'demo') {
     audioEngine.disconnectCurrent();
-    demoBtn.classList.remove('active');
+    resetActiveButtons();
     trackTitle.textContent = "Gestoppt";
     trackArtist.textContent = "Kein Audio aktiv";
   } else {
@@ -94,13 +121,7 @@ demoBtn.addEventListener('click', () => {
   }
 });
 
-function resetActiveButtons() {
-  micBtn.classList.remove('active');
-  micLabel.textContent = "Mikrofon";
-  demoBtn.classList.remove('active');
-}
-
-// 4. Spotify Modal & Connect
+// 5. Spotify Modal & PKCE Connect
 spotifyRedirectUriDisplay.textContent = spotify.redirectUri;
 if (spotify.clientId) {
   spotifyClientIdInput.value = spotify.clientId;
@@ -126,7 +147,7 @@ spotifyConnectSubmit.addEventListener('click', () => {
   }
 });
 
-// 5. Drag and Drop Audio Files
+// 6. Drag and Drop Audio Files
 window.addEventListener('dragover', (e) => {
   e.preventDefault();
   dropOverlay.classList.add('active');
@@ -148,7 +169,7 @@ window.addEventListener('drop', (e) => {
   }
 });
 
-// 6. Fullscreen toggle
+// 7. Fullscreen toggle
 fullscreenBtn.addEventListener('click', () => {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen().catch((err) => {
@@ -159,7 +180,7 @@ fullscreenBtn.addEventListener('click', () => {
   }
 });
 
-// 7. Theme / Color Dots
+// 8. Theme / Color Dots
 document.querySelectorAll('.color-dot').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.color-dot').forEach(b => b.classList.remove('active'));
