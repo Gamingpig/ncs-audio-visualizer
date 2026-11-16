@@ -2,12 +2,27 @@
  * Audio Engine managing Web Audio API, AnalyserNode, FFT analysis,
  * Local file playback, Microphone stream, Screen / System Audio Capture (getDisplayMedia),
  * and Trap Demo synthesizer.
+ *
+ * CRITICAL SAFETY ARCHITECTURE:
+ * To eliminate feedback loops, screeching, and deafening echoes when capturing
+ * System Audio or Microphone, the AnalyserNode is STRICTLY an analysis sink and
+ * is NEVER connected to audioCtx.destination!
+ *
+ * Audio Routing:
+ * - Local File & Demo Beat:
+ *     Source -> PlaybackGain -> audioCtx.destination (Audible)
+ *     Source -> AnalyserGain -> AnalyserNode (Visualized)
+ *
+ * - System Audio & Microphone:
+ *     Stream -> AnalyserGain -> AnalyserNode (Visualized ONLY)
+ *     (NEVER routed to audioCtx.destination to prevent feedback loops!)
  */
 export class AudioEngine {
   constructor() {
     this.audioCtx = null;
     this.analyser = null;
-    this.gainNode = null;
+    this.analyserGainNode = null;
+    this.playbackGainNode = null;
     this.sourceNode = null;
     this.audioElement = new Audio();
     this.audioElement.crossOrigin = "anonymous";
@@ -28,8 +43,26 @@ export class AudioEngine {
     this.kickPeak = false;
     this.prevBass = 0;
 
+    // Adjustable sensitivity (visualizer scale) and playback volume
+    this.sensitivity = 1.0;
+    this.playbackVolume = 1.0;
+
     // Callbacks
     this.onTrackChange = null;
+    this.onTimeUpdate = null;
+    this.onEnded = null;
+
+    // Audio Element event listeners
+    this.audioElement.addEventListener('timeupdate', () => {
+      if (this.onTimeUpdate && this.currentMode === 'file') {
+        this.onTimeUpdate(this.audioElement.currentTime, this.audioElement.duration || 0);
+      }
+    });
+
+    this.audioElement.addEventListener('ended', () => {
+      this.isPlaying = false;
+      if (this.onEnded) this.onEnded();
+    });
   }
 
   ensureAudioContext() {
@@ -40,74 +73,135 @@ export class AudioEngine {
       // Analyser with responsive smoothing
       this.analyser = this.audioCtx.createAnalyser();
       this.analyser.fftSize = this.fftSize;
-      this.analyser.smoothingTimeConstant = 0.78;
+      this.analyser.smoothingTimeConstant = 0.8;
 
-      // Sensitivity Boost Gain Node (especially critical for Mic & external devices)
-      this.gainNode = this.audioCtx.createGain();
-      this.gainNode.gain.value = 1.0;
-      this.gainNode.connect(this.analyser);
+      // Sensitivity Gain Node feeding ONLY into the Analyser
+      this.analyserGainNode = this.audioCtx.createGain();
+      this.analyserGainNode.gain.value = this.sensitivity;
+      this.analyserGainNode.connect(this.analyser);
+      // NOTE: this.analyser is NEVER connected to audioCtx.destination!
+
+      // Playback Gain Node strictly for audible sources (Local File & Synth Demo)
+      this.playbackGainNode = this.audioCtx.createGain();
+      this.playbackGainNode.gain.value = this.playbackVolume;
+      this.playbackGainNode.connect(this.audioCtx.destination);
     }
+
     if (this.audioCtx.state === 'suspended') {
       this.audioCtx.resume();
     }
   }
 
+  setSensitivity(val) {
+    this.sensitivity = Math.max(0.1, Math.min(3.0, val));
+    if (this.analyserGainNode && this.audioCtx) {
+      this.analyserGainNode.gain.setTargetAtTime(this.sensitivity, this.audioCtx.currentTime, 0.05);
+    }
+  }
+
+  setPlaybackVolume(val) {
+    this.playbackVolume = Math.max(0.0, Math.min(1.0, val));
+    if (this.playbackGainNode && this.audioCtx) {
+      this.playbackGainNode.gain.setTargetAtTime(this.playbackVolume, this.audioCtx.currentTime, 0.05);
+    }
+  }
+
   disconnectCurrent() {
+    // 1. Disconnect any active media stream or file source
     if (this.sourceNode) {
       try {
         this.sourceNode.disconnect();
       } catch (e) {
-        console.warn(e);
+        console.warn("Fehler beim Trennen von sourceNode:", e);
       }
       this.sourceNode = null;
     }
+
+    // 2. Stop all live media stream tracks (Screen / Tab / Mic)
     if (this.activeStream) {
-      this.activeStream.getTracks().forEach(track => track.stop());
+      this.activeStream.getTracks().forEach(track => {
+        try {
+          track.stop();
+        } catch (e) {
+          console.warn(e);
+        }
+      });
       this.activeStream = null;
     }
+
+    // 3. Stop audio element
     if (this.audioElement) {
       this.audioElement.pause();
     }
+
+    // 4. Clear demo synthesizer interval
     if (this.demoInterval) {
       clearInterval(this.demoInterval);
       this.demoInterval = null;
     }
+
     this.isPlaying = false;
     this.currentMode = null;
   }
 
-  // Input 1: System Audio Capture via getDisplayMedia
+  /**
+   * Input 1: System Audio / Screen Audio Capture (getDisplayMedia)
+   * SAFE & FEEDBACK-FREE:
+   * The stream is routed ONLY into analyserGainNode -> analyser.
+   * It is NEVER sent to audioCtx.destination, preventing any loopback into speakers!
+   */
   async startSystemAudio() {
     this.ensureAudioContext();
     this.disconnectCurrent();
 
     try {
-      // Prompt user to share a tab or system screen with audio checked
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
+      // Configuration preventing tab echo and requesting pure system/tab audio
+      const constraints = {
+        video: {
+          displaySurface: "browser",
+          selfBrowserSurface: "exclude" // Prevents picking current visualizer tab to avoid echo
+        },
         audio: {
+          systemAudio: "include",
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false
         }
-      });
+      };
+
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+      } catch (e) {
+        // Fallback for older browsers that may reject advanced constraints
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: true,
+          audio: true
+        });
+      }
 
       const audioTracks = stream.getAudioTracks();
       if (!audioTracks || audioTracks.length === 0) {
         stream.getTracks().forEach(t => t.stop());
-        alert("Keine Audio-Spur geteilt! Bitte stelle im Browser-Dialog sicher, dass 'System-Audio teilen' bzw. 'Audio der Registerkarte teilen' aktiviert ist.");
-        return false;
+        throw new Error("NO_AUDIO_TRACK");
       }
 
-      // Stop unused video track immediately to save CPU/GPU resources
-      const videoTracks = stream.getVideoTracks();
-      videoTracks.forEach(vt => vt.stop());
+      // Stop unused video track immediately to save GPU and CPU
+      stream.getVideoTracks().forEach(vt => vt.stop());
 
       this.activeStream = stream;
-      this.gainNode.gain.value = 1.6; // High punch for system audio
-      this.sourceNode = this.audioCtx.createMediaStreamSource(new MediaStream(audioTracks));
-      this.sourceNode.connect(this.gainNode);
-      // DO NOT connect to destination to prevent feedback loop!
+
+      // Clean line-level gain (1.0) multiplied by user sensitivity.
+      // NEVER set high gains like 1.6+ which cause digital clipping on 0dBFS tracks!
+      this.analyserGainNode.gain.setValueAtTime(this.sensitivity * 1.0, this.audioCtx.currentTime);
+
+      // Create stream source for audio analysis only
+      const audioStream = new MediaStream([audioTracks[0]]);
+      this.sourceNode = this.audioCtx.createMediaStreamSource(audioStream);
+
+      // Connect ONLY to analyserGainNode -> AnalyserNode.
+      // DO NOT connect to playbackGainNode or destination!
+      this.sourceNode.connect(this.analyserGainNode);
 
       this.isPlaying = true;
       this.currentMode = 'system';
@@ -117,7 +211,7 @@ export class AudioEngine {
         if (this.onTrackChange) {
           this.onTrackChange({
             title: "Gestoppt",
-            artist: "System-Audio beendet",
+            artist: "System-Audio Übertragung beendet",
             cover: null
           });
         }
@@ -125,19 +219,31 @@ export class AudioEngine {
 
       if (this.onTrackChange) {
         this.onTrackChange({
-          title: "Live System Audio (Spotify / Browser / Desktop)",
-          artist: "Direkte Audio-Schleife",
+          title: "Live System-Audio",
+          artist: "Visualisiert Desktop, Spotify, YouTube & Games",
           cover: null
         });
       }
       return true;
     } catch (err) {
+      if (err.name === 'NotAllowedError') {
+        console.info("Benutzer hat die System-Audio-Freigabe abgebrochen.");
+        return false;
+      }
+      if (err.message === "NO_AUDIO_TRACK") {
+        alert("Keine Audio-Spur ausgewählt! Bitte aktiviere im Browser-Fenster das Häkchen bei 'Audio der Registerkarte teilen' bzw. 'System-Audio teilen'.");
+        return false;
+      }
       console.error("System-Audio Capture fehlgeschlagen:", err);
+      alert("System-Audio konnte nicht gestartet werden: " + err.message);
       return false;
     }
   }
 
-  // Input 2: Microphone with Sensitivity Boost
+  /**
+   * Input 2: Microphone with Sensitivity
+   * Routed ONLY to AnalyserNode, never to destination!
+   */
   async startMicrophone() {
     this.ensureAudioContext();
     this.disconnectCurrent();
@@ -151,11 +257,12 @@ export class AudioEngine {
         }
       });
 
-      // Boost mic gain substantially so bars react with full amplitude
-      this.gainNode.gain.value = 2.8;
+      // Microphone signals are generally lower amplitude, boost slightly
+      this.analyserGainNode.gain.setValueAtTime(this.sensitivity * 2.2, this.audioCtx.currentTime);
+
       this.sourceNode = this.audioCtx.createMediaStreamSource(this.activeStream);
-      this.sourceNode.connect(this.gainNode);
-      // DO NOT connect to destination!
+      // CONNECT ONLY TO ANALYSER! NEVER TO DESTINATION!
+      this.sourceNode.connect(this.analyserGainNode);
 
       this.isPlaying = true;
       this.currentMode = 'mic';
@@ -163,19 +270,27 @@ export class AudioEngine {
       if (this.onTrackChange) {
         this.onTrackChange({
           title: "Live Mikrofon Input",
-          artist: "Verstärkter Raum- & Stereo-Mix",
+          artist: "Raum-Audio / Externer Eingang",
           cover: null
         });
       }
       return true;
     } catch (err) {
-      console.error("Mikrofon-Zugriff verweigert oder fehlgeschlagen:", err);
+      if (err.name === 'NotAllowedError') {
+        console.info("Mikrofon-Zugriff abgelehnt.");
+        return false;
+      }
+      console.error("Mikrofon-Fehler:", err);
       alert("Konnte nicht auf das Mikrofon zugreifen: " + err.message);
       return false;
     }
   }
 
-  // Input 3: Local Audio File (MP3, WAV, FLAC)
+  /**
+   * Input 3: Local Audio File (MP3, WAV, FLAC, OGG)
+   * Routed to BOTH playbackGainNode -> destination (Hear)
+   * AND analyserGainNode -> analyser (Visualize)
+   */
   playLocalFile(file) {
     this.ensureAudioContext();
     this.disconnectCurrent();
@@ -188,12 +303,17 @@ export class AudioEngine {
       this.fileSourceNode = this.audioCtx.createMediaElementSource(this.audioElement);
       this.fileSourceCreated = true;
     }
-    this.sourceNode = this.fileSourceNode;
-    this.gainNode.gain.value = 1.0;
-    this.sourceNode.connect(this.gainNode);
-    this.analyser.connect(this.audioCtx.destination);
 
-    this.audioElement.play();
+    this.sourceNode = this.fileSourceNode;
+
+    // Reset visualizer sensitivity
+    this.analyserGainNode.gain.setValueAtTime(this.sensitivity * 1.0, this.audioCtx.currentTime);
+
+    // Safe dual routing:
+    this.sourceNode.connect(this.analyserGainNode); // To visualizer
+    this.sourceNode.connect(this.playbackGainNode); // To speakers
+
+    this.audioElement.play().catch(e => console.warn("Autoplay block:", e));
     this.isPlaying = true;
     this.currentMode = 'file';
 
@@ -207,7 +327,30 @@ export class AudioEngine {
     }
   }
 
-  // Input 4: Trap Demo Beat Generator (140 BPM Sub-808, Snare, Hi-Hat Rolls)
+  togglePlayPause() {
+    if (this.currentMode === 'file') {
+      if (this.audioElement.paused) {
+        this.audioElement.play();
+        this.isPlaying = true;
+      } else {
+        this.audioElement.pause();
+        this.isPlaying = false;
+      }
+      return this.isPlaying;
+    }
+    return false;
+  }
+
+  seek(seconds) {
+    if (this.currentMode === 'file' && Number.isFinite(seconds)) {
+      this.audioElement.currentTime = seconds;
+    }
+  }
+
+  /**
+   * Input 4: Trap Demo Beat Synthesizer (140 BPM Sub-808, Snare, Hi-Hat Rolls)
+   * Dual routed to playback and analyser cleanly.
+   */
   startDemoBeat() {
     this.ensureAudioContext();
     this.disconnectCurrent();
@@ -215,15 +358,17 @@ export class AudioEngine {
     this.isPlaying = true;
     this.currentMode = 'demo';
 
-    const masterGain = this.audioCtx.createGain();
-    masterGain.gain.value = 0.95;
-    masterGain.connect(this.analyser);
-    this.analyser.connect(this.audioCtx.destination);
+    const synthMasterGain = this.audioCtx.createGain();
+    synthMasterGain.gain.value = 0.85;
+
+    // Dual route synth:
+    synthMasterGain.connect(this.analyserGainNode); // Visualizer
+    synthMasterGain.connect(this.playbackGainNode); // Speakers
 
     if (this.onTrackChange) {
       this.onTrackChange({
-        title: "NCS Trap Anthem (Synthesized Demo)",
-        artist: "140 BPM Sub-808 Trap Generator",
+        title: "NCS Trap Anthem (Synthesizer Demo)",
+        artist: "140 BPM Sub-808 Trap Beat",
         cover: null
       });
     }
@@ -244,7 +389,7 @@ export class AudioEngine {
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.45);
 
       osc.connect(gain);
-      gain.connect(masterGain);
+      gain.connect(synthMasterGain);
       osc.start(time);
       osc.stop(time + 0.45);
     };
@@ -264,12 +409,12 @@ export class AudioEngine {
       filter.frequency.setValueAtTime(6500, time);
 
       const gain = this.audioCtx.createGain();
-      gain.gain.setValueAtTime(isRolled ? 0.2 : 0.35, time);
+      gain.gain.setValueAtTime(isRolled ? 0.18 : 0.3, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + (isRolled ? 0.025 : 0.045));
 
       whiteNoise.connect(filter);
       filter.connect(gain);
-      gain.connect(masterGain);
+      gain.connect(synthMasterGain);
       whiteNoise.start(time);
     };
 
@@ -279,10 +424,10 @@ export class AudioEngine {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(200, time);
       osc.frequency.exponentialRampToValueAtTime(85, time + 0.1);
-      oscGain.gain.setValueAtTime(0.7, time);
+      oscGain.gain.setValueAtTime(0.65, time);
       oscGain.gain.exponentialRampToValueAtTime(0.01, time + 0.13);
       osc.connect(oscGain);
-      oscGain.connect(masterGain);
+      oscGain.connect(synthMasterGain);
       osc.start(time);
       osc.stop(time + 0.13);
 
@@ -298,11 +443,11 @@ export class AudioEngine {
       filter.type = 'highpass';
       filter.frequency.setValueAtTime(1100, time);
       const noiseGain = this.audioCtx.createGain();
-      noiseGain.gain.setValueAtTime(0.6, time);
+      noiseGain.gain.setValueAtTime(0.5, time);
       noiseGain.gain.exponentialRampToValueAtTime(0.01, time + 0.2);
       noise.connect(filter);
       filter.connect(noiseGain);
-      noiseGain.connect(masterGain);
+      noiseGain.connect(synthMasterGain);
       noise.start(time);
     };
 
@@ -316,12 +461,12 @@ export class AudioEngine {
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(1600, time);
 
-      gain.gain.setValueAtTime(0.16, time);
+      gain.gain.setValueAtTime(0.14, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
 
       osc.connect(filter);
       filter.connect(gain);
-      gain.connect(masterGain);
+      gain.connect(synthMasterGain);
       osc.start(time);
       osc.stop(time + 0.22);
     };
@@ -333,24 +478,24 @@ export class AudioEngine {
       while (nextNoteTime < this.audioCtx.currentTime + 0.1) {
         const beatStep = step % 16;
 
-        // Punchy Trap Kick pattern
+        // Kick pattern
         if (beatStep === 0 || beatStep === 6 || beatStep === 10) {
           playSubKick(nextNoteTime);
         }
 
-        // Snare / Clap
+        // Snare
         if (beatStep === 4 || beatStep === 12) {
           playSnare(nextNoteTime);
         }
 
-        // Hi-Hat rolls
+        // Hi-Hats
         if (beatStep >= 14) {
           playHiHat(nextNoteTime, true);
         } else {
           playHiHat(nextNoteTime, false);
         }
 
-        // Synth leads
+        // Leads
         if (beatStep % 2 === 0) {
           const note = melodyNotes[(step >> 1) % melodyNotes.length];
           playMelody(nextNoteTime, note);
@@ -390,19 +535,19 @@ export class AudioEngine {
         sum += this.freqData[i];
         count++;
       }
-      return count > 0 ? sum / count / 255 : 0;
+      return count > 0 ? (sum / count / 255) : 0;
     };
 
-    // Subbass (Trap circle punch: ~30-90Hz)
+    // Subbass (Trap circle punch: ~30-95Hz)
     this.subBass = getAverageRange(30, 95);
-    this.bass = getAverageRange(95, 250);
-    this.mid = getAverageRange(250, 2600);
-    this.treble = getAverageRange(2600, 11000);
+    this.bass = getAverageRange(95, 260);
+    this.mid = getAverageRange(260, 2800);
+    this.treble = getAverageRange(2800, 11000);
 
-    // Fast Kick Peak Detection
-    const bassEnergy = (this.subBass * 0.75 + this.bass * 0.25);
-    const threshold = 0.48;
-    this.kickPeak = bassEnergy > threshold && (bassEnergy - this.prevBass) > 0.06;
+    // Kick Peak Detection with hysteresis
+    const bassEnergy = (this.subBass * 0.7 + this.bass * 0.3);
+    const threshold = 0.42;
+    this.kickPeak = bassEnergy > threshold && (bassEnergy - this.prevBass) > 0.05;
     this.prevBass = bassEnergy;
 
     return {
