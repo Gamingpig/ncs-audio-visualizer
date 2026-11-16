@@ -1,14 +1,12 @@
 /**
- * NCSVisualizer - High-Fidelity NCS (NoCopyrightSounds) Trap Circle Visualizer
- *
- * Visual Characteristics:
- * - 128 discrete radial spectrum bars mapped symmetrically (bass at bottom, highs at top).
- * - Perceptual log-frequency binning with smooth cubic attack & decay physics.
- * - Dynamic spring-damper physics on the central circle reacting to sub-bass (30-95Hz).
- * - Expanding neon shockwave rings triggered on heavy kick transients.
- * - Multi-layer radial glow halo that breathes in sync with bass rhythm.
- * - Radial particle burst explosion on kick drops + ambient starfield drift.
- * - Masked high-res circle album cover / NCS emblem with inner depth vignette and dual neon rims.
+ * Universal High-Fidelity Audio Spectrum Visualizer
+ * Inspired by the iconic After Effects Trapcode Audio Spectrum (e.g. Elektronomia - Sky High):
+ * - 128 discrete radial spectrum bars mapped symmetrically with high-contrast glowing gradients.
+ * - Dynamic 2nd-order spring-damper physics on the central disc reacting to kick & sub-bass.
+ * - Expanding neon shockwave ripple rings on heavy kick transients.
+ * - Multi-layer radial ambient glow halo behind the circle that breathes in sync with the beat.
+ * - Radial particle burst explosions on kicks + ambient stardust floating drift.
+ * - Masked album artwork / neutral high-tech sound core disc with dual neon rims (No forced NCS branding!).
  */
 export class NCSVisualizer {
   constructor(canvas) {
@@ -20,9 +18,9 @@ export class NCSVisualizer {
     this.currentRadius = 145;
     this.radiusVelocity = 0; // For spring physics
 
-    // Colors
-    this.primaryColor = '#00ff44';
-    this.glowColor = '#00e5ff';
+    // Default theme: Elektronomia Sky High Electric Gold / Amber
+    this.primaryColor = '#ffe600';
+    this.glowColor = '#ff7700';
 
     // Cover art setup
     this.coverImage = new Image();
@@ -42,9 +40,6 @@ export class NCSVisualizer {
     this.barEnergies = new Float32Array(this.barsCount);
     this.barPeaks = new Float32Array(this.barsCount);
 
-    // Subtle ambient spin
-    this.rotation = 0;
-
     // DPI & canvas sizing
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.resize();
@@ -56,26 +51,36 @@ export class NCSVisualizer {
     this.glowColor = glow;
   }
 
+  /**
+   * Neutral, modern music disc emblem (completely free of NCS branding)
+   * Featuring concentric vinyl grooving and a glowing sound wave core.
+   */
   setDefaultLogo() {
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
         <defs>
           <radialGradient id="discBg" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#141420"/>
-            <stop offset="70%" stop-color="#0a0a12"/>
-            <stop offset="100%" stop-color="#040408"/>
+            <stop offset="0%" stop-color="#181828"/>
+            <stop offset="50%" stop-color="#0e0e18"/>
+            <stop offset="100%" stop-color="#05050a"/>
           </radialGradient>
+          <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ffe600"/>
+            <stop offset="100%" stop-color="#ff7700"/>
+          </linearGradient>
         </defs>
         <circle cx="256" cy="256" r="256" fill="url(#discBg)"/>
         <!-- Concentric vinyl grooving -->
-        <circle cx="256" cy="256" r="236" fill="none" stroke="#252538" stroke-width="2" opacity="0.6"/>
-        <circle cx="256" cy="256" r="200" fill="none" stroke="#1c1c2a" stroke-width="1.5" opacity="0.8"/>
-        <circle cx="256" cy="256" r="160" fill="none" stroke="#252538" stroke-width="2" opacity="0.6"/>
-        <!-- Inner accent ring -->
-        <circle cx="256" cy="256" r="128" fill="none" stroke="#00ff88" stroke-width="6" opacity="0.45"/>
-        <!-- Typography -->
-        <text x="256" y="252" fill="#ffffff" font-family="'Segoe UI', Roboto, -apple-system, sans-serif" font-weight="900" font-size="94" text-anchor="middle" letter-spacing="8">NCS</text>
-        <text x="256" y="306" fill="#00ff88" font-family="'Segoe UI', Roboto, -apple-system, sans-serif" font-weight="700" font-size="20" text-anchor="middle" letter-spacing="9">NOCOPYRIGHTSOUNDS</text>
+        <circle cx="256" cy="256" r="238" fill="none" stroke="#252538" stroke-width="2" opacity="0.6"/>
+        <circle cx="256" cy="256" r="210" fill="none" stroke="#1c1c2a" stroke-width="1.5" opacity="0.8"/>
+        <circle cx="256" cy="256" r="180" fill="none" stroke="#252538" stroke-width="2" opacity="0.5"/>
+        <circle cx="256" cy="256" r="148" fill="none" stroke="#1c1c2a" stroke-width="1.5" opacity="0.7"/>
+        <circle cx="256" cy="256" r="116" fill="none" stroke="#ffe600" stroke-width="3" opacity="0.4"/>
+        <circle cx="256" cy="256" r="80" fill="#0d0d16" stroke="#252538" stroke-width="2"/>
+        <!-- Central glowing waveform graphic -->
+        <path d="M 180 256 Q 195 210, 210 256 T 240 256 T 256 195 T 272 317 T 302 256 T 332 256"
+              fill="none" stroke="url(#waveGrad)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="256" cy="256" r="10" fill="#ffffff" opacity="0.9"/>
       </svg>
     `;
     this.coverImage.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
@@ -119,13 +124,13 @@ export class NCSVisualizer {
     this.currentRadius = this.baseRadius;
   }
 
-  // Trigger shockwave ring on heavy kicks
+  // Shockwave ripple ring on heavy kicks
   triggerShockwave(energy) {
     this.shockwaves.push({
       radius: this.currentRadius,
       maxRadius: this.currentRadius + 140 + energy * 160,
       alpha: 0.85,
-      speed: 5.0 + energy * 8.0,
+      speed: 5.5 + energy * 8.5,
       width: 3.5,
       color: this.primaryColor
     });
@@ -224,12 +229,10 @@ export class NCSVisualizer {
   }
 
   /**
-   * Symmetrical Perceptual Frequency Mapping
-   * 128 discrete radial bars:
-   * Left side (0..63) and Right side (64..127) mirror each other.
-   * Bass is concentrated symmetrically at the bottom, mids sweep around sides, highs meet at top.
+   * Symmetrical After Effects Audio Spectrum (128 radial bars)
+   * Left side and right side mirror each other perfectly.
    */
-  drawTrapcodeRadialBars(freqData, subBass) {
+  drawRadialSpectrum(freqData, subBass) {
     const ctx = this.ctx;
     const cx = this.width / 2;
     const cy = this.height / 2;
@@ -242,12 +245,12 @@ export class NCSVisualizer {
       const symIndex = i < halfCount ? i : (count - 1 - i);
       const frac = symIndex / halfCount; // 0 (bottom/bass) to 1 (top/treble)
 
-      // Log-perceptual bin index: concentrates low bins for bass punch
+      // Perceptual bin index: concentrates low bins for bass punch
       const minBin = 2;
-      const maxBin = Math.floor(binCount * 0.75);
-      const binIdx = Math.floor(minBin + Math.pow(frac, 2.1) * (maxBin - minBin));
+      const maxBin = Math.floor(binCount * 0.72);
+      const binIdx = Math.floor(minBin + Math.pow(frac, 2.0) * (maxBin - minBin));
 
-      // Sample a small 3-bin average for smooth bar response
+      // 3-bin average for silky-smooth response
       let valSum = 0;
       const sampleSpread = 2;
       for (let s = -sampleSpread; s <= sampleSpread; s++) {
@@ -256,16 +259,14 @@ export class NCSVisualizer {
       }
       let rawVal = (valSum / (sampleSpread * 2 + 1)) / 255.0;
 
-      // Frequency compensation: boost higher frequencies slightly to match human hearing curve
-      const trebleBoost = 1.0 + frac * 0.85;
+      // Equal loudness compensation curve
+      const trebleBoost = 1.0 + frac * 0.9;
       rawVal = Math.min(1.0, rawVal * trebleBoost);
 
-      // Attack / Release Physics
+      // Fast explosive attack & smooth release
       if (rawVal > this.barEnergies[i]) {
-        // Fast explosive attack
         this.barEnergies[i] = this.barEnergies[i] * 0.18 + rawVal * 0.82;
       } else {
-        // Smooth damped release
         this.barEnergies[i] = this.barEnergies[i] * 0.84 + rawVal * 0.16;
       }
 
@@ -304,7 +305,7 @@ export class NCSVisualizer {
       // Glowing multi-color gradient from primary to glow accent
       const barGrad = ctx.createLinearGradient(startX, startY, endX, endY);
       barGrad.addColorStop(0, this.primaryColor);
-      barGrad.addColorStop(0.65, this.primaryColor);
+      barGrad.addColorStop(0.7, this.primaryColor);
       barGrad.addColorStop(1, this.glowColor);
 
       ctx.strokeStyle = barGrad;
@@ -332,7 +333,7 @@ export class NCSVisualizer {
       }
     }
 
-    // 2. Smooth Continuous Envelope Line (Classic NCS wave connecting bar tips)
+    // 2. Smooth Continuous Envelope Line connecting bar tips
     ctx.shadowBlur = 22;
     ctx.shadowColor = this.primaryColor;
     ctx.lineWidth = 2.0;
@@ -401,7 +402,7 @@ export class NCSVisualizer {
     ctx.arc(cx, cy, r + 2.5, 0, Math.PI * 2);
     ctx.stroke();
 
-    // 3. Masked Album Cover Art / NCS Emblem
+    // 3. Masked Album Cover Art / Sound Core
     ctx.beginPath();
     ctx.arc(cx, cy, r - 2.5, 0, Math.PI * 2);
     ctx.closePath();
@@ -415,7 +416,7 @@ export class NCSVisualizer {
       ctx.fill();
     }
 
-    // 4. Inner Vignette / Radial Dark Shadow for Depth
+    // 4. Inner Vignette / Radial Dark Shadow for 3D Depth
     const innerShadow = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r - 2.5);
     innerShadow.addColorStop(0, 'rgba(0, 0, 0, 0)');
     innerShadow.addColorStop(0.75, 'rgba(0, 0, 0, 0.25)');
@@ -432,8 +433,7 @@ export class NCSVisualizer {
   render(audioMetrics) {
     const { freqData, subBass, kickPeak } = audioMetrics;
 
-    // Spring-damper physics for natural bouncy circle pulsation:
-    // target displacement depends on subbass punch (~30-95Hz)
+    // Spring-damper physics for natural bouncy 4-on-the-floor pulsation:
     const targetRadius = this.baseRadius * (1.0 + Math.pow(subBass, 1.8) * 0.42);
     const displacement = targetRadius - this.currentRadius;
     const springStiffness = 0.28;
@@ -443,7 +443,7 @@ export class NCSVisualizer {
     this.radiusVelocity *= damping;
     this.currentRadius += this.radiusVelocity;
 
-    // Eject shockwave & particles on kick transients
+    // Eject shockwaves & particles on kick transients
     if (kickPeak) {
       this.triggerShockwave(subBass);
       this.spawnBassExplosion(subBass);
@@ -479,8 +479,8 @@ export class NCSVisualizer {
     this.updateParticles();
     this.drawParticles();
 
-    // 3. Trapcode Radial Spectrum Bars
-    this.drawTrapcodeRadialBars(freqData, subBass);
+    // 3. Radial Spectrum Bars
+    this.drawRadialSpectrum(freqData, subBass);
 
     // 4. Center Disc
     this.drawCenterCircle(subBass);

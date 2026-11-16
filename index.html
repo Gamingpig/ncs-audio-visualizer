@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>NCS WebGL Audio Visualizer</title>
-  <meta name="description" content="Hochperformanter, reaktiver WebGL Audio Visualizer im originalen NoCopyrightSounds (NCS) Trap-Kreis Style.">
+  <title>Audio Spectrum Visualizer</title>
+  <meta name="description" content="Universeller, reaktiver WebGL Audio Visualizer im After Effects Spectrum Style.">
   <link rel="stylesheet" href="css/style.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2245%22 fill=%22none%22 stroke=%22%2300ff88%22 stroke-width=%228%22/><circle cx=%2250%22 cy=%2250%22 r=%2222%22 fill=%22%2300ff88%22/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2245%22 fill=%22none%22 stroke=%22%23ffe600%22 stroke-width=%228%22/><circle cx=%2250%22 cy=%2250%22 r=%2222%22 fill=%22%23ffe600%22/></svg>">
 </head>
 <body>
   <!-- Fullscreen Visualizer Canvas -->
@@ -15,14 +15,23 @@
   <!-- Top Controls & Track Info -->
   <header class="top-bar">
     <div class="brand">
-      <span class="ncs-badge">NCS</span>
-      <span class="brand-title">TRAP VISUALIZER</span>
+      <span class="brand-badge">AUDIO</span>
+      <span class="brand-title">SPECTRUM</span>
     </div>
     <div class="track-meta" id="trackMeta">
       <span id="trackTitle" class="title">Kein Audio aktiv</span>
-      <span id="trackArtist" class="artist">Wähle eine Audioquelle oder ziehe eine MP3/WAV hierher</span>
+      <span id="trackArtist" class="artist">Wähle eine Audioquelle oder ziehe eine Musikdatei hierher</span>
     </div>
     <div class="top-actions">
+      <!-- Custom Cover Art Picker -->
+      <label class="icon-btn" title="Eigenes Cover-Bild für den Kreis wählen" aria-label="Cover wählen">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+        </svg>
+        <input type="file" id="coverFileInput" accept="image/*" style="display:none;">
+      </label>
+
+      <!-- Fullscreen Toggle -->
       <button id="fullscreenBtn" class="icon-btn" title="Vollbild umschalten" aria-label="Fullscreen">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
           <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
@@ -31,7 +40,7 @@
     </div>
   </header>
 
-  <!-- Mini Player Scrubber for Local Files (shown when file is loaded) -->
+  <!-- Mini Player Scrubber for Local Files -->
   <div id="filePlayerBar" class="file-player-bar glass-panel hidden">
     <button id="playPauseBtn" class="play-btn" title="Abspielen / Pausieren">
       <svg id="playIcon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -42,11 +51,11 @@
     <span id="totalDuration" class="time-label">0:00</span>
   </div>
 
-  <!-- Bottom Interactive Bar -->
+  <!-- Bottom Interactive Controls Bar -->
   <nav class="controls-bar glass-panel">
     <div class="input-controls">
       <!-- System Audio Stream (Screen/Audio Sharing) -->
-      <button id="systemAudioBtn" class="btn btn-accent" title="System-Audio oder Browser-Tab streamen (z. B. Spotify Web, YouTube, Desktop)">
+      <button id="systemAudioBtn" class="btn btn-accent" title="System-Audio oder Browser-Tab streamen (Spotify, YouTube, Desktop)">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M21 3H3c-1.11 0-2 .89-2 2v12c0 1.1.89 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.11-.9-2-2-2zm0 14H3V5h18v12zm-9-9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
         <span id="systemAudioLabel">System-Audio</span>
       </button>
@@ -64,10 +73,10 @@
         <span id="micLabel">Mikrofon</span>
       </button>
 
-      <!-- Demo Track Generator -->
+      <!-- Progressive House Demo Beat (Elektronomia Sky High Style) -->
       <button id="demoBtn" class="btn">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-        <span>Trap Demo</span>
+        <span>House Demo</span>
       </button>
 
       <!-- Spotify Connect -->
@@ -77,7 +86,7 @@
       </button>
     </div>
 
-    <!-- Live Controls: Sensitivity & Volume -->
+    <!-- Sliders: Sensitivity & Volume -->
     <div class="slider-controls">
       <div class="slider-group" title="Ausschlag der Frequenzbalken anpassen">
         <span class="slider-label">Gain:</span>
@@ -93,12 +102,13 @@
     <div class="theme-controls">
       <span class="theme-label">Glow:</span>
       <div class="color-presets">
-        <button class="color-dot active" data-color="#00ff44" data-glow="#00e5ff" style="background: linear-gradient(135deg, #00ff44, #00e5ff)" title="NCS Classic Green / Cyan"></button>
-        <button class="color-dot" data-color="#ff0055" data-glow="#ff7700" style="background: linear-gradient(135deg, #ff0055, #ff7700)" title="NCS Crimson Flame"></button>
-        <button class="color-dot" data-color="#ffe600" data-glow="#ff5500" style="background: linear-gradient(135deg, #ffe600, #ff5500)" title="Electric Gold (Alan Walker)"></button>
+        <!-- Elektronomia Sky High Electric Gold default -->
+        <button class="color-dot active" data-color="#ffe600" data-glow="#ff7700" style="background: linear-gradient(135deg, #ffe600, #ff7700)" title="Elektronomia Electric Gold"></button>
+        <button class="color-dot" data-color="#00f0ff" data-glow="#0055ff" style="background: linear-gradient(135deg, #00f0ff, #0055ff)" title="Glacier Cyan"></button>
+        <button class="color-dot" data-color="#ff0055" data-glow="#ff5500" style="background: linear-gradient(135deg, #ff0055, #ff5500)" title="Crimson Flame"></button>
         <button class="color-dot" data-color="#b026ff" data-glow="#00d4ff" style="background: linear-gradient(135deg, #b026ff, #00d4ff)" title="Cyber Violet"></button>
-        <button class="color-dot" data-color="#00f0ff" data-glow="#0048ff" style="background: linear-gradient(135deg, #00f0ff, #0048ff)" title="Glacier Cyan"></button>
-        <button class="color-dot" data-color="#ffffff" data-glow="#00ffcc" style="background: linear-gradient(135deg, #ffffff, #00ffcc)" title="Platinum White"></button>
+        <button class="color-dot" data-color="#00ff66" data-glow="#00e5ff" style="background: linear-gradient(135deg, #00ff66, #00e5ff)" title="Neon Mint"></button>
+        <button class="color-dot" data-color="#ffffff" data-glow="#00e5ff" style="background: linear-gradient(135deg, #ffffff, #00e5ff)" title="Platinum White"></button>
       </div>
     </div>
   </nav>
@@ -112,9 +122,9 @@
   <!-- Drag and Drop Overlay -->
   <div id="dropOverlay" class="drop-overlay">
     <div class="drop-box">
-      <svg viewBox="0 0 24 24" width="64" height="64" fill="#00ff88"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
-      <p>Audio-Datei hier loslassen</p>
-      <span>MP3, WAV, FLAC, OGG, AAC</span>
+      <svg viewBox="0 0 24 24" width="64" height="64" fill="var(--primary-color)"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+      <p>Audio-Datei oder Cover hier loslassen</p>
+      <span>MP3, WAV, FLAC, OGG, PNG, JPG</span>
     </div>
   </div>
 

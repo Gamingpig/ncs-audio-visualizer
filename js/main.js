@@ -1,12 +1,14 @@
 import { AudioEngine } from './audio.js';
 import { NCSVisualizer } from './visualizer.js';
 import { SpotifyAuth } from './spotify.js';
+import { extractMetadata } from './id3.js';
 
 // DOM Elements
 const canvas = document.getElementById('visualizerCanvas');
 const systemAudioBtn = document.getElementById('systemAudioBtn');
 const systemAudioLabel = document.getElementById('systemAudioLabel');
 const audioFileInput = document.getElementById('audioFileInput');
+const coverFileInput = document.getElementById('coverFileInput');
 const micBtn = document.getElementById('micBtn');
 const micLabel = document.getElementById('micLabel');
 const demoBtn = document.getElementById('demoBtn');
@@ -162,21 +164,41 @@ systemAudioBtn.addEventListener('click', async () => {
     if (success) {
       systemAudioBtn.classList.add('active');
       systemAudioLabel.textContent = "Streamt Live";
-      showToast("System-Audio aktiv: Rückkopplungsfrei & glasklar visualisiert!");
+      showToast("System-Audio aktiv: Rückkopplungsfrei visualisiert!");
     }
   }
 });
+
+// Helper: Process local audio file with ID3 metadata extraction
+async function loadAudioFile(file) {
+  showToast("Lade Audio-Datei...");
+  const meta = await extractMetadata(file);
+  audioEngine.playLocalFile(file, meta);
+  resetActiveButtons();
+  filePlayerBar.classList.remove('hidden');
+  playIcon.classList.add('hidden');
+  pauseIcon.classList.remove('hidden');
+  if (meta.cover) {
+    visualizer.setCoverArt(meta.cover);
+  }
+  showToast(`Titel: ${meta.title}`);
+}
 
 // 2. Local File Input Handler
 audioFileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (file) {
-    audioEngine.playLocalFile(file);
-    resetActiveButtons();
-    filePlayerBar.classList.remove('hidden');
-    playIcon.classList.add('hidden');
-    pauseIcon.classList.remove('hidden');
-    showToast(`Audio geladen: ${file.name}`);
+    loadAudioFile(file);
+  }
+});
+
+// Custom Cover Image Input
+coverFileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file && file.type.startsWith('image/')) {
+    const url = URL.createObjectURL(file);
+    visualizer.setCoverArt(url);
+    showToast("Cover-Bild erfolgreich gesetzt!");
   }
 });
 
@@ -199,19 +221,19 @@ micBtn.addEventListener('click', async () => {
   }
 });
 
-// 4. Trap Beat Demo Loop
+// 4. Progressive House Demo Beat Loop (Elektronomia Sky High 128 BPM Style)
 demoBtn.addEventListener('click', () => {
   if (audioEngine.currentMode === 'demo') {
     audioEngine.disconnectCurrent();
     resetActiveButtons();
     trackTitle.textContent = "Gestoppt";
     trackArtist.textContent = "Kein Audio aktiv";
-    showToast("Trap Demo gestoppt.");
+    showToast("House Demo gestoppt.");
   } else {
     resetActiveButtons();
     demoBtn.classList.add('active');
     audioEngine.startDemoBeat();
-    showToast("Trap Demo Beat gestartet (140 BPM Sub-808).");
+    showToast("Sky High Progressive House Demo gestartet (128 BPM)!");
   }
 });
 
@@ -241,7 +263,7 @@ spotifyConnectSubmit.addEventListener('click', () => {
   }
 });
 
-// 6. Drag and Drop Audio Files
+// 6. Drag and Drop Audio & Image Files
 window.addEventListener('dragover', (e) => {
   e.preventDefault();
   dropOverlay.classList.add('active');
@@ -257,13 +279,15 @@ window.addEventListener('drop', (e) => {
   e.preventDefault();
   dropOverlay.classList.remove('active');
   const files = e.dataTransfer.files;
-  if (files.length > 0 && files[0].type.startsWith('audio/')) {
-    audioEngine.playLocalFile(files[0]);
-    resetActiveButtons();
-    filePlayerBar.classList.remove('hidden');
-    playIcon.classList.add('hidden');
-    pauseIcon.classList.remove('hidden');
-    showToast(`Audio geladen: ${files[0].name}`);
+  if (files.length > 0) {
+    const file = files[0];
+    if (file.type.startsWith('audio/')) {
+      loadAudioFile(file);
+    } else if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      visualizer.setCoverArt(url);
+      showToast("Cover-Bild übernommen!");
+    }
   }
 });
 
