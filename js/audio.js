@@ -1,11 +1,14 @@
 /**
- * Audio Engine managing Web Audio API, AnalyserNode, FFT analysis,
- * Local file playback, Microphone stream, Screen / System Audio Capture (getDisplayMedia),
- * and Progressive House / EDM Demo synthesizer.
+ * Ultra Low-Latency Audio Engine
  *
- * CRITICAL SAFETY ARCHITECTURE:
- * AnalyserNode is STRICTLY an analysis sink and is NEVER connected to audioCtx.destination!
- * System Audio and Microphone are NEVER routed to speakers, preventing all feedback loops.
+ * Latency Optimizations:
+ * - fftSize reduced to 1024 (~23ms buffer at 44.1kHz).
+ * - smoothingTimeConstant reduced to 0.15 for ultra-responsive, instantaneous transient attack.
+ * - Zero-delay frequency bin analysis with instant transient pass-through.
+ *
+ * Safety:
+ * - AnalyserNode is STRICTLY an analysis sink and NEVER connects to audioCtx.destination!
+ * - Zero feedback loops on System-Audio or Microphone.
  */
 export class AudioEngine {
   constructor() {
@@ -20,7 +23,8 @@ export class AudioEngine {
     this.isPlaying = false;
     this.currentMode = null; // 'file', 'mic', 'system', 'demo'
 
-    this.fftSize = 2048;
+    // Low latency FFT settings
+    this.fftSize = 1024;
     this.frequencyBinCount = this.fftSize / 2;
     this.freqData = new Uint8Array(this.frequencyBinCount);
     this.timeData = new Uint8Array(this.frequencyBinCount);
@@ -58,12 +62,13 @@ export class AudioEngine {
   ensureAudioContext() {
     if (!this.audioCtx) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-      this.audioCtx = new AudioContextClass();
+      // High-performance audio context with low latency
+      this.audioCtx = new AudioContextClass({ latencyHint: 'interactive' });
 
-      // Analyser with responsive smoothing
+      // Analyser with minimal smoothing for INSTANT zero-delay responsiveness
       this.analyser = this.audioCtx.createAnalyser();
       this.analyser.fftSize = this.fftSize;
-      this.analyser.smoothingTimeConstant = 0.82;
+      this.analyser.smoothingTimeConstant = 0.15; // Instant attack!
 
       // Sensitivity Gain Node feeding ONLY into the Analyser
       this.analyserGainNode = this.audioCtx.createGain();
@@ -84,14 +89,14 @@ export class AudioEngine {
   setSensitivity(val) {
     this.sensitivity = Math.max(0.1, Math.min(3.0, val));
     if (this.analyserGainNode && this.audioCtx) {
-      this.analyserGainNode.gain.setTargetAtTime(this.sensitivity, this.audioCtx.currentTime, 0.05);
+      this.analyserGainNode.gain.setValueAtTime(this.sensitivity, this.audioCtx.currentTime);
     }
   }
 
   setPlaybackVolume(val) {
     this.playbackVolume = Math.max(0.0, Math.min(1.0, val));
     if (this.playbackGainNode && this.audioCtx) {
-      this.playbackGainNode.gain.setTargetAtTime(this.playbackVolume, this.audioCtx.currentTime, 0.05);
+      this.playbackGainNode.gain.setValueAtTime(this.playbackVolume, this.audioCtx.currentTime);
     }
   }
 
@@ -100,7 +105,7 @@ export class AudioEngine {
       try {
         this.sourceNode.disconnect();
       } catch (e) {
-        console.warn("Fehler beim Trennen von sourceNode:", e);
+        console.warn("Disconnect error:", e);
       }
       this.sourceNode = null;
     }
@@ -130,7 +135,7 @@ export class AudioEngine {
   }
 
   /**
-   * Input 1: System Audio / Screen Audio Capture (getDisplayMedia)
+   * Input 1: System Audio / Screen Audio Capture
    */
   async startSystemAudio() {
     this.ensureAudioContext();
@@ -215,7 +220,7 @@ export class AudioEngine {
   }
 
   /**
-   * Input 2: Microphone with Sensitivity
+   * Input 2: Microphone
    */
   async startMicrophone() {
     this.ensureAudioContext();
@@ -230,7 +235,7 @@ export class AudioEngine {
         }
       });
 
-      this.analyserGainNode.gain.setValueAtTime(this.sensitivity * 2.2, this.audioCtx.currentTime);
+      this.analyserGainNode.gain.setValueAtTime(this.sensitivity * 2.0, this.audioCtx.currentTime);
       this.sourceNode = this.audioCtx.createMediaStreamSource(this.activeStream);
       this.sourceNode.connect(this.analyserGainNode);
 
@@ -315,7 +320,7 @@ export class AudioEngine {
   }
 
   /**
-   * Input 4: Progressive House / Melodic EDM Synthesizer (128 BPM Sky High Style)
+   * Input 4: Progressive House Demo Beat Synthesizer (128 BPM Sky High Style)
    */
   startDemoBeat() {
     this.ensureAudioContext();
@@ -332,17 +337,16 @@ export class AudioEngine {
 
     if (this.onTrackChange) {
       this.onTrackChange({
-        title: "Sky High Anthem (128 BPM Progressive House)",
+        title: "Sky High (128 BPM Progressive House)",
         artist: "Elektronomia Style Melodic Synthesizer",
         cover: null
       });
     }
 
     let step = 0;
-    const bpm = 128; // Progressive House standard
-    const stepTime = (60 / bpm) / 4; // 16th notes
+    const bpm = 128;
+    const stepTime = (60 / bpm) / 4;
 
-    // 1. Punchy Progressive House Kick
     const playHouseKick = (time) => {
       const osc = this.audioCtx.createOscillator();
       const gain = this.audioCtx.createGain();
@@ -360,7 +364,6 @@ export class AudioEngine {
       osc.stop(time + 0.38);
     };
 
-    // 2. Offbeat Hi-Hat (Progressive House groove)
     const playOpenHat = (time) => {
       const bufferSize = this.audioCtx.sampleRate * 0.08;
       const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
@@ -385,7 +388,6 @@ export class AudioEngine {
       noise.start(time);
     };
 
-    // 3. Crisp Snare / Clap on 2 & 4
     const playClap = (time) => {
       const bufferSize = this.audioCtx.sampleRate * 0.16;
       const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
@@ -411,7 +413,6 @@ export class AudioEngine {
       noise.start(time);
     };
 
-    // 4. Rolling Electro Bassline
     const playBassNote = (time, freq) => {
       const osc = this.audioCtx.createOscillator();
       const gain = this.audioCtx.createGain();
@@ -434,7 +435,6 @@ export class AudioEngine {
       osc.stop(time + 0.14);
     };
 
-    // 5. Sky High Euphoric Lead Melody
     const playEuphoricLead = (time, freq) => {
       const osc = this.audioCtx.createOscillator();
       const osc2 = this.audioCtx.createOscillator();
@@ -444,7 +444,6 @@ export class AudioEngine {
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(freq, time);
 
-      // Slight detune for super-saw width
       osc2.type = 'sawtooth';
       osc2.frequency.setValueAtTime(freq * 1.006, time);
 
@@ -466,8 +465,6 @@ export class AudioEngine {
       osc2.stop(time + 0.26);
     };
 
-    // Progressive House Sky High Melody in D# minor / F# Major
-    // D#4=311.13, F#4=369.99, G#4=415.30, A#4=466.16, C#5=554.37, D#5=622.25
     const melodyPattern = [
       466.16, 554.37, 622.25, 466.16,
       554.37, 622.25, 466.16, 415.30,
@@ -482,26 +479,13 @@ export class AudioEngine {
       while (nextNoteTime < this.audioCtx.currentTime + 0.1) {
         const beatStep = step % 16;
 
-        // 4-on-the-floor House Kick: on steps 0, 4, 8, 12
-        if (beatStep % 4 === 0) {
-          playHouseKick(nextNoteTime);
-        }
+        if (beatStep % 4 === 0) playHouseKick(nextNoteTime);
+        if (beatStep % 4 === 2) playOpenHat(nextNoteTime);
+        if (beatStep === 4 || beatStep === 12) playClap(nextNoteTime);
 
-        // Offbeat Hi-hat: on steps 2, 6, 10, 14
-        if (beatStep % 4 === 2) {
-          playOpenHat(nextNoteTime);
-        }
-
-        // Snare / Clap: on steps 4, 12
-        if (beatStep === 4 || beatStep === 12) {
-          playClap(nextNoteTime);
-        }
-
-        // Rolling Bass
         const bassFreq = bassNotes[(step >> 2) % bassNotes.length];
         playBassNote(nextNoteTime, bassFreq);
 
-        // Euphoric Progressive Lead Melody
         const leadFreq = melodyPattern[step % melodyPattern.length];
         playEuphoricLead(nextNoteTime, leadFreq);
 
@@ -511,7 +495,7 @@ export class AudioEngine {
     }, 25);
   }
 
-  // Update FFT data every frame
+  // Ultra-fast FFT update
   update() {
     if (!this.analyser) {
       return {
@@ -525,33 +509,30 @@ export class AudioEngine {
     }
 
     this.analyser.getByteFrequencyData(this.freqData);
-    this.analyser.getByteTimeDomainData(this.timeData);
 
     const sampleRate = this.audioCtx ? this.audioCtx.sampleRate : 44100;
     const binWidth = sampleRate / this.fftSize;
 
-    const getAverageRange = (minHz, maxHz) => {
-      const startBin = Math.max(0, Math.floor(minHz / binWidth));
-      const endBin = Math.min(this.frequencyBinCount - 1, Math.ceil(maxHz / binWidth));
+    // Fast inline range averaging
+    const getAvg = (minHz, maxHz) => {
+      const start = (minHz / binWidth) | 0;
+      const end = Math.min(this.frequencyBinCount - 1, ((maxHz / binWidth) + 1) | 0);
       let sum = 0;
       let count = 0;
-      for (let i = startBin; i <= endBin; i++) {
+      for (let i = start; i <= end; i++) {
         sum += this.freqData[i];
         count++;
       }
-      return count > 0 ? (sum / count / 255) : 0;
+      return count > 0 ? (sum / (count * 255)) : 0;
     };
 
-    // Subbass (House 4-on-the-floor punch: 35-95Hz)
-    this.subBass = getAverageRange(35, 95);
-    this.bass = getAverageRange(95, 260);
-    this.mid = getAverageRange(260, 3000);
-    this.treble = getAverageRange(3000, 12000);
+    this.subBass = getAvg(35, 95);
+    this.bass = getAvg(95, 260);
+    this.mid = getAvg(260, 3000);
+    this.treble = getAvg(3000, 11000);
 
-    // House Kick detection
     const bassEnergy = (this.subBass * 0.75 + this.bass * 0.25);
-    const threshold = 0.40;
-    this.kickPeak = bassEnergy > threshold && (bassEnergy - this.prevBass) > 0.055;
+    this.kickPeak = bassEnergy > 0.38 && (bassEnergy - this.prevBass) > 0.05;
     this.prevBass = bassEnergy;
 
     return {
