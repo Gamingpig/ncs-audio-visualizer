@@ -9,6 +9,7 @@ const systemAudioBtn = document.getElementById('systemAudioBtn');
 const systemAudioLabel = document.getElementById('systemAudioLabel');
 const audioFileInput = document.getElementById('audioFileInput');
 const coverFileInput = document.getElementById('coverFileInput');
+const bgFileInput = document.getElementById('bgFileInput');
 const micBtn = document.getElementById('micBtn');
 const micLabel = document.getElementById('micLabel');
 const demoBtn = document.getElementById('demoBtn');
@@ -58,15 +59,27 @@ const visualizer = new NCSVisualizer(canvas);
 
 // Spotify PKCE Handler
 const spotify = new SpotifyAuth((meta) => {
-  trackTitle.textContent = meta.title;
-  trackArtist.textContent = meta.artist;
-  if (meta.cover) {
-    visualizer.setCoverArt(meta.cover);
+  if (meta) {
+    trackTitle.textContent = meta.title;
+    trackArtist.textContent = meta.artist;
+    if (meta.cover) {
+      visualizer.setCoverArt(meta.cover);
+    }
   }
 });
 
 // Audio Engine track update callback
 audioEngine.onTrackChange = (meta) => {
+  // If Spotify is currently playing and active in system audio mode, prefer Spotify's rich metadata!
+  if (spotify.currentTrack && audioEngine.currentMode === 'system') {
+    trackTitle.textContent = spotify.currentTrack.title;
+    trackArtist.textContent = spotify.currentTrack.artist;
+    if (spotify.currentTrack.cover) {
+      visualizer.setCoverArt(spotify.currentTrack.cover);
+    }
+    return;
+  }
+
   trackTitle.textContent = meta.title;
   trackArtist.textContent = meta.artist;
   if (meta.cover) {
@@ -164,6 +177,17 @@ systemAudioBtn.addEventListener('click', async () => {
     if (success) {
       systemAudioBtn.classList.add('active');
       systemAudioLabel.textContent = "Streamt Live";
+
+      // If Spotify is authorized, check immediately for the track
+      if (spotify.accessToken) {
+        spotify.fetchCurrentlyPlaying(true).then(track => {
+          if (track) {
+            trackTitle.textContent = track.title;
+            trackArtist.textContent = track.artist;
+            if (track.cover) visualizer.setCoverArt(track.cover);
+          }
+        });
+      }
       showToast("System-Audio aktiv: Rückkopplungsfrei visualisiert!");
     }
   }
@@ -202,6 +226,16 @@ coverFileInput.addEventListener('change', (e) => {
   }
 });
 
+// Custom Background Image Input
+bgFileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file && file.type.startsWith('image/')) {
+    const url = URL.createObjectURL(file);
+    visualizer.setBackgroundArt(url);
+    showToast("Hintergrund-Bild gesetzt!");
+  }
+});
+
 // 3. Microphone / Live Room Audio Input
 micBtn.addEventListener('click', async () => {
   if (audioEngine.currentMode === 'mic') {
@@ -237,16 +271,26 @@ demoBtn.addEventListener('click', () => {
   }
 });
 
-// 5. Spotify Modal & PKCE Connect
+// 5. Spotify Sync & Modal
 spotifyRedirectUriDisplay.textContent = spotify.redirectUri;
 if (spotify.clientId) {
   spotifyClientIdInput.value = spotify.clientId;
 }
 
-spotifyBtn.addEventListener('click', () => {
+spotifyBtn.addEventListener('click', async () => {
   if (spotify.accessToken) {
-    showToast("Spotify ist bereits autorisiert!");
-    spotify.fetchCurrentlyPlaying();
+    showToast("Prüfe aktuellen Spotify-Track...");
+    const track = await spotify.fetchCurrentlyPlaying(true);
+    if (track) {
+      trackTitle.textContent = track.title;
+      trackArtist.textContent = track.artist;
+      if (track.cover) {
+        visualizer.setCoverArt(track.cover);
+      }
+      showToast(`Spotify: "${track.title}" von ${track.artist}`);
+    } else {
+      showToast("Spotify ist verbunden, aber kein Song aktiv. Bitte drücke Play in deiner Spotify-App!");
+    }
   } else {
     spotifyModal.classList.remove('hidden');
   }
@@ -285,8 +329,19 @@ window.addEventListener('drop', (e) => {
       loadAudioFile(file);
     } else if (file.type.startsWith('image/')) {
       const url = URL.createObjectURL(file);
-      visualizer.setCoverArt(url);
-      showToast("Cover-Bild übernommen!");
+      // If user drops an image: if wide landscape, set background; if square/near-square, set cover!
+      const testImg = new Image();
+      testImg.src = url;
+      testImg.onload = () => {
+        const aspect = testImg.width / testImg.height;
+        if (aspect > 1.3) {
+          visualizer.setBackgroundArt(url);
+          showToast("Hintergrund-Bild übernommen!");
+        } else {
+          visualizer.setCoverArt(url);
+          showToast("Cover-Bild übernommen!");
+        }
+      };
     }
   }
 });

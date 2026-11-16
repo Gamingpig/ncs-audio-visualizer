@@ -20,7 +20,7 @@
     </div>
     <div class="track-meta" id="trackMeta">
       <span id="trackTitle" class="title">Kein Audio aktiv</span>
-      <span id="trackArtist" class="artist">Wähle eine Audioquelle oder ziehe eine Musikdatei hierher</span>
+      <span id="trackArtist" class="artist">Wähle eine Audioquelle oder starte Spotify / eine Datei</span>
     </div>
     <div class="top-actions">
       <!-- Custom Cover Art Picker -->
@@ -29,6 +29,14 @@
           <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
         </svg>
         <input type="file" id="coverFileInput" accept="image/*" style="display:none;">
+      </label>
+
+      <!-- Custom Background Wallpaper Picker -->
+      <label class="icon-btn" title="Eigenes Hintergrund-Wallpaper wählen" aria-label="Hintergrund wählen">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5.04-6.71l-2.75 3.54-1.96-2.36L6.5 17h11l-3.54-4.71z"/>
+        </svg>
+        <input type="file" id="bgFileInput" accept="image/*" style="display:none;">
       </label>
 
       <!-- Fullscreen Toggle -->
@@ -80,9 +88,9 @@
       </button>
 
       <!-- Spotify Connect -->
-      <button id="spotifyBtn" class="btn btn-spotify">
+      <button id="spotifyBtn" class="btn btn-spotify" title="Spotify-Account verbinden oder Track-Synchronisation aktualisieren">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.59 14.42c-.18.3-.57.39-.87.21-2.39-1.46-5.4-1.79-8.95-.98-.34.08-.68-.14-.76-.48-.08-.34.14-.68.48-.76 3.88-.89 7.23-.51 9.89 1.13.3.19.39.58.21.88zm1.22-2.73c-.23.37-.71.49-1.08.26-2.73-1.68-6.9-2.17-10.14-1.19-.42.13-.86-.11-.98-.53-.13-.42.11-.86.53-.98 3.71-1.12 8.32-.58 11.41 1.34.37.23.49.72.26 1.1zm.11-2.85c-3.28-1.95-8.7-2.13-11.83-1.18-.5.15-1.04-.13-1.19-.63-.15-.5.13-1.04.63-1.19 3.66-1.11 9.66-.9 13.46 1.36.45.27.6.86.33 1.31-.27.46-.86.6-1.4.33z"/></svg>
-        <span id="spotifyLabel">Spotify PKCE</span>
+        <span id="spotifyLabel">Spotify Sync</span>
       </button>
     </div>
 
@@ -123,7 +131,7 @@
   <div id="dropOverlay" class="drop-overlay">
     <div class="drop-box">
       <svg viewBox="0 0 24 24" width="64" height="64" fill="var(--primary-color)"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
-      <p>Audio-Datei oder Cover hier loslassen</p>
+      <p>Audio-Datei, Cover oder Wallpaper hier loslassen</p>
       <span>MP3, WAV, FLAC, OGG, PNG, JPG</span>
     </div>
   </div>

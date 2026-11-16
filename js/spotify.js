@@ -1,10 +1,12 @@
 /**
  * Spotify Web API integration using PKCE OAuth 2.0 Authorization Code Flow.
- * No server backend required. Syncs current track, artist, album art, and audio analysis.
+ * Handles automatic token refresh, continuous track polling,
+ * and immediate track synchronization.
  */
 export class SpotifyAuth {
   constructor(onTrackUpdate) {
     this.clientId = localStorage.getItem("spotify_client_id") || "";
+    // Redirect URI must match the current URL exactly without query parameters
     this.redirectUri = window.location.origin + window.location.pathname;
     this.accessToken = localStorage.getItem("spotify_access_token") || null;
     this.refreshToken = localStorage.getItem("spotify_refresh_token") || null;
@@ -12,9 +14,12 @@ export class SpotifyAuth {
     this.onTrackUpdate = onTrackUpdate;
     this.pollingInterval = null;
     this.lastTrackId = null;
+    this.currentTrack = null;
 
     // Handle OAuth callback on redirect
-    this.handleCallback();
+    this.handleCallback().then(() => {
+      this.initAuth();
+    });
   }
 
   // Generate cryptographic code verifier
@@ -67,12 +72,12 @@ export class SpotifyAuth {
     const code = urlParams.get('code');
 
     if (code) {
-      // Remove code from address bar cleanly
+      // Clean up URL bar
       window.history.replaceState({}, document.title, window.location.pathname);
 
       const codeVerifier = localStorage.getItem('spotify_code_verifier');
       if (!codeVerifier) {
-        console.warn("No code verifier found in storage");
+        console.warn("Kein code_verifier im Storage gefunden.");
         return;
       }
 
@@ -107,22 +112,73 @@ export class SpotifyAuth {
           localStorage.setItem('spotify_refresh_token', this.refreshToken);
         }
         localStorage.setItem('spotify_token_expiry', this.tokenExpiry.toString());
-
-        this.startPolling();
       } catch (err) {
         console.error("Spotify Auth Error:", err);
       }
-    } else if (this.accessToken && Date.now() < this.tokenExpiry) {
+    }
+  }
+
+  async initAuth() {
+    if (!this.accessToken) return;
+
+    // Check if token is expired or close to expiry (within 60s)
+    if (Date.now() >= this.tokenExpiry - 60000) {
+      await this.refreshAccessToken();
+    }
+
+    if (this.accessToken) {
       this.startPolling();
+    }
+  }
+
+  async refreshAccessToken() {
+    if (!this.refreshToken || !this.clientId) {
+      console.warn("Kann Spotify Token nicht erneuern: Keine Refresh-Token oder Client-ID vorhanden.");
+      return false;
+    }
+
+    const body = new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: this.refreshToken,
+      client_id: this.clientId
+    });
+
+    try {
+      const response = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body
+      });
+
+      if (!response.ok) {
+        throw new Error('Refresh failed: ' + response.statusText);
+      }
+
+      const data = await response.json();
+      this.accessToken = data.access_token;
+      if (data.refresh_token) {
+        this.refreshToken = data.refresh_token;
+        localStorage.setItem('spotify_refresh_token', this.refreshToken);
+      }
+      this.tokenExpiry = Date.now() + (data.expires_in * 1000);
+
+      localStorage.setItem('spotify_access_token', this.accessToken);
+      localStorage.setItem('spotify_token_expiry', this.tokenExpiry.toString());
+      return true;
+    } catch (err) {
+      console.error("Spotify Token Refresh Error:", err);
+      return false;
     }
   }
 
   startPolling() {
     if (this.pollingInterval) clearInterval(this.pollingInterval);
-    this.fetchCurrentlyPlaying();
+    this.fetchCurrentlyPlaying(true);
     this.pollingInterval = setInterval(() => {
-      this.fetchCurrentlyPlaying();
-    }, 2500);
+      this.fetchCurrentlyPlaying(false);
+    }, 2000);
   }
 
   stopPolling() {
@@ -132,8 +188,14 @@ export class SpotifyAuth {
     }
   }
 
-  async fetchCurrentlyPlaying() {
-    if (!this.accessToken) return;
+  async fetchCurrentlyPlaying(forceUpdate = false) {
+    if (!this.accessToken) return null;
+
+    // Check if token expired
+    if (Date.now() >= this.tokenExpiry - 30000) {
+      const refreshed = await this.refreshAccessToken();
+      if (!refreshed) return null;
+    }
 
     try {
       const res = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
@@ -142,33 +204,50 @@ export class SpotifyAuth {
         }
       });
 
-      if (res.status === 204 || res.status > 400) {
-        return; // Nothing playing or expired
+      // 401 Unauthorized -> Token expired, refresh immediately
+      if (res.status === 401) {
+        const refreshed = await this.refreshAccessToken();
+        if (refreshed) {
+          return this.fetchCurrentlyPlaying(forceUpdate);
+        }
+        return null;
+      }
+
+      // 204 No Content -> Nothing currently playing on Spotify
+      if (res.status === 204) {
+        return null;
+      }
+
+      if (!res.ok) {
+        return null;
       }
 
       const data = await res.json();
       if (data && data.item) {
         const item = data.item;
         const trackId = item.id;
+        const title = item.name;
+        const artist = item.artists.map(a => a.name).join(', ');
+        const cover = item.album.images && item.album.images[0] ? item.album.images[0].url : null;
 
-        if (trackId !== this.lastTrackId) {
+        this.currentTrack = {
+          title,
+          artist,
+          cover,
+          isPlaying: data.is_playing
+        };
+
+        if (forceUpdate || trackId !== this.lastTrackId) {
           this.lastTrackId = trackId;
-          const title = item.name;
-          const artist = item.artists.map(a => a.name).join(', ');
-          const cover = item.album.images && item.album.images[0] ? item.album.images[0].url : null;
-
           if (this.onTrackUpdate) {
-            this.onTrackUpdate({
-              title,
-              artist,
-              cover,
-              isPlaying: data.is_playing
-            });
+            this.onTrackUpdate(this.currentTrack);
           }
         }
+        return this.currentTrack;
       }
     } catch (e) {
-      console.warn("Spotify fetch error:", e);
+      console.warn("Spotify fetchCurrentlyPlaying error:", e);
     }
+    return null;
   }
 }

@@ -1,12 +1,12 @@
 /**
- * Universal High-Fidelity Audio Spectrum Visualizer
- * Inspired by the iconic After Effects Trapcode Audio Spectrum (e.g. Elektronomia - Sky High):
- * - 128 discrete radial spectrum bars mapped symmetrically with high-contrast glowing gradients.
- * - Dynamic 2nd-order spring-damper physics on the central disc reacting to kick & sub-bass.
- * - Expanding neon shockwave ripple rings on heavy kick transients.
- * - Multi-layer radial ambient glow halo behind the circle that breathes in sync with the beat.
- * - Radial particle burst explosions on kicks + ambient stardust floating drift.
- * - Masked album artwork / neutral high-tech sound core disc with dual neon rims (No forced NCS branding!).
+ * High-Fidelity Audio Spectrum Visualizer
+ * Faithful 1:1 recreation of the classic After Effects Audio Spectrum (e.g. Elektronomia - Sky High):
+ * - Atmospheric cosmic nebula & mountain silhouette background with dynamic Bass Zoom.
+ * - Symmetrical 128 radial Analog Lines with bright white cores and electric gold neon tips.
+ * - Open, razor-sharp spike tips (No cartoonish envelope wire!).
+ * - Razor-sharp white circular disc rim with intense neon halo bloom.
+ * - Authentic 4-on-the-floor Progressive House spring kick-bounce.
+ * - Reactive shockwave ripple rings & floating bokeh particles.
  */
 export class NCSVisualizer {
   constructor(canvas) {
@@ -14,8 +14,8 @@ export class NCSVisualizer {
     this.ctx = canvas.getContext('2d', { alpha: false });
 
     // Base geometry
-    this.baseRadius = 145;
-    this.currentRadius = 145;
+    this.baseRadius = 140;
+    this.currentRadius = 140;
     this.radiusVelocity = 0; // For spring physics
 
     // Default theme: Elektronomia Sky High Electric Gold / Amber
@@ -28,17 +28,21 @@ export class NCSVisualizer {
     this.coverLoaded = false;
     this.setDefaultLogo();
 
+    // Custom background image (if loaded)
+    this.backgroundImage = null;
+
     // Particle systems
     this.particles = [];
-    this.maxParticles = 320;
+    this.maxParticles = 180;
+    this.stars = [];
+    this.initStars();
 
     // Shockwave ripple rings
     this.shockwaves = [];
 
-    // Trapcode Spectrum: 128 discrete radial bars
+    // 128 discrete radial analog lines
     this.barsCount = 128;
     this.barEnergies = new Float32Array(this.barsCount);
-    this.barPeaks = new Float32Array(this.barsCount);
 
     // DPI & canvas sizing
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -51,36 +55,50 @@ export class NCSVisualizer {
     this.glowColor = glow;
   }
 
+  initStars() {
+    this.stars = [];
+    for (let i = 0; i < 90; i++) {
+      this.stars.push({
+        x: Math.random(),
+        y: Math.random(),
+        size: 0.8 + Math.random() * 2.0,
+        baseAlpha: 0.2 + Math.random() * 0.6,
+        speed: 0.0003 + Math.random() * 0.0008,
+        twinklePhase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+
   /**
-   * Neutral, modern music disc emblem (completely free of NCS branding)
-   * Featuring concentric vinyl grooving and a glowing sound wave core.
+   * Neutral, high-tech vinyl sound core disc (completely free of NCS branding)
    */
   setDefaultLogo() {
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
         <defs>
           <radialGradient id="discBg" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#181828"/>
-            <stop offset="50%" stop-color="#0e0e18"/>
-            <stop offset="100%" stop-color="#05050a"/>
+            <stop offset="0%" stop-color="#18182c"/>
+            <stop offset="60%" stop-color="#0c0c16"/>
+            <stop offset="100%" stop-color="#04040a"/>
           </radialGradient>
           <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#ffe600"/>
+            <stop offset="0%" stop-color="#ffffff"/>
+            <stop offset="40%" stop-color="#ffe600"/>
             <stop offset="100%" stop-color="#ff7700"/>
           </linearGradient>
         </defs>
         <circle cx="256" cy="256" r="256" fill="url(#discBg)"/>
-        <!-- Concentric vinyl grooving -->
-        <circle cx="256" cy="256" r="238" fill="none" stroke="#252538" stroke-width="2" opacity="0.6"/>
-        <circle cx="256" cy="256" r="210" fill="none" stroke="#1c1c2a" stroke-width="1.5" opacity="0.8"/>
-        <circle cx="256" cy="256" r="180" fill="none" stroke="#252538" stroke-width="2" opacity="0.5"/>
-        <circle cx="256" cy="256" r="148" fill="none" stroke="#1c1c2a" stroke-width="1.5" opacity="0.7"/>
-        <circle cx="256" cy="256" r="116" fill="none" stroke="#ffe600" stroke-width="3" opacity="0.4"/>
-        <circle cx="256" cy="256" r="80" fill="#0d0d16" stroke="#252538" stroke-width="2"/>
-        <!-- Central glowing waveform graphic -->
-        <path d="M 180 256 Q 195 210, 210 256 T 240 256 T 256 195 T 272 317 T 302 256 T 332 256"
+        <!-- Fine vinyl micro-grooves -->
+        <circle cx="256" cy="256" r="238" fill="none" stroke="#25253c" stroke-width="1.8" opacity="0.6"/>
+        <circle cx="256" cy="256" r="212" fill="none" stroke="#1c1c2e" stroke-width="1.5" opacity="0.8"/>
+        <circle cx="256" cy="256" r="182" fill="none" stroke="#25253c" stroke-width="1.8" opacity="0.6"/>
+        <circle cx="256" cy="256" r="150" fill="none" stroke="#1c1c2e" stroke-width="1.5" opacity="0.7"/>
+        <circle cx="256" cy="256" r="118" fill="none" stroke="#ffe600" stroke-width="2.5" opacity="0.4"/>
+        <circle cx="256" cy="256" r="82" fill="#0b0b14" stroke="#25253c" stroke-width="2"/>
+        <!-- Centered glowing soundwave core -->
+        <path d="M 175 256 Q 195 200, 215 256 T 240 256 T 256 185 T 272 327 T 297 256 T 337 256"
               fill="none" stroke="url(#waveGrad)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="256" cy="256" r="10" fill="#ffffff" opacity="0.9"/>
+        <circle cx="256" cy="256" r="9" fill="#ffffff" opacity="0.95"/>
       </svg>
     `;
     this.coverImage.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
@@ -106,6 +124,19 @@ export class NCSVisualizer {
     };
   }
 
+  setBackgroundArt(url) {
+    if (!url) {
+      this.backgroundImage = null;
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = url;
+    img.onload = () => {
+      this.backgroundImage = img;
+    };
+  }
+
   resize() {
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.width = window.innerWidth;
@@ -120,7 +151,7 @@ export class NCSVisualizer {
     this.ctx.scale(this.dpr, this.dpr);
 
     const minDim = Math.min(this.width, this.height);
-    this.baseRadius = Math.max(95, Math.min(185, minDim * 0.19));
+    this.baseRadius = Math.max(90, Math.min(175, minDim * 0.185));
     this.currentRadius = this.baseRadius;
   }
 
@@ -128,10 +159,10 @@ export class NCSVisualizer {
   triggerShockwave(energy) {
     this.shockwaves.push({
       radius: this.currentRadius,
-      maxRadius: this.currentRadius + 140 + energy * 160,
-      alpha: 0.85,
-      speed: 5.5 + energy * 8.5,
-      width: 3.5,
+      maxRadius: this.currentRadius + 130 + energy * 150,
+      alpha: 0.8,
+      speed: 5.0 + energy * 8.0,
+      width: 3.0,
       color: this.primaryColor
     });
   }
@@ -141,8 +172,8 @@ export class NCSVisualizer {
       const sw = this.shockwaves[i];
       sw.radius += sw.speed;
       const progress = (sw.radius - this.currentRadius) / (sw.maxRadius - this.currentRadius);
-      sw.alpha = Math.max(0, 0.85 * (1 - progress));
-      sw.width = Math.max(0.5, 3.5 * (1 - progress * 0.7));
+      sw.alpha = Math.max(0, 0.8 * (1 - progress));
+      sw.width = Math.max(0.5, 3.0 * (1 - progress * 0.6));
 
       if (sw.alpha <= 0.01 || sw.radius >= sw.maxRadius) {
         this.shockwaves.splice(i, 1);
@@ -171,7 +202,7 @@ export class NCSVisualizer {
 
   // Radial particle explosion on kick transient
   spawnBassExplosion(energy) {
-    const count = Math.floor(20 + energy * 40);
+    const count = Math.floor(18 + energy * 36);
     const cx = this.width / 2;
     const cy = this.height / 2;
     const r = this.currentRadius;
@@ -182,8 +213,8 @@ export class NCSVisualizer {
       }
 
       const angle = Math.random() * Math.PI * 2;
-      const speed = 4.0 + Math.random() * 10.0 * (energy + 0.5);
-      const size = 1.5 + Math.random() * 3.5;
+      const speed = 4.0 + Math.random() * 9.0 * (energy + 0.5);
+      const size = 1.4 + Math.random() * 3.2;
 
       this.particles.push({
         x: cx + Math.cos(angle) * (r + 4),
@@ -193,7 +224,7 @@ export class NCSVisualizer {
         alpha: 1.0,
         decay: 0.016 + Math.random() * 0.02,
         size: size,
-        color: Math.random() > 0.4 ? this.primaryColor : this.glowColor
+        color: Math.random() > 0.35 ? this.primaryColor : this.glowColor
       });
     }
   }
@@ -203,7 +234,7 @@ export class NCSVisualizer {
       const p = this.particles[i];
       p.x += p.vx;
       p.y += p.vy;
-      p.vx *= 0.95; // Aerodynamic drag
+      p.vx *= 0.95;
       p.vy *= 0.95;
       p.alpha -= p.decay;
 
@@ -229,8 +260,85 @@ export class NCSVisualizer {
   }
 
   /**
-   * Symmetrical After Effects Audio Spectrum (128 radial bars)
-   * Left side and right side mirror each other perfectly.
+   * Draw Atmospheric Sky High Cosmic Background with Bass Zoom
+   */
+  drawBackground(subBass) {
+    const ctx = this.ctx;
+    const w = this.width;
+    const h = this.height;
+    const cx = w / 2;
+    const cy = h / 2;
+
+    ctx.save();
+
+    // Bass zoom scale factor (After Effects Bass Shake)
+    const zoomScale = 1.0 + Math.pow(subBass, 1.8) * 0.035;
+    ctx.translate(cx, cy);
+    ctx.scale(zoomScale, zoomScale);
+    ctx.translate(-cx, -cy);
+
+    if (this.backgroundImage && this.backgroundImage.width > 0) {
+      ctx.drawImage(this.backgroundImage, 0, 0, w, h);
+    } else {
+      // Procedural Deep Atmospheric Cosmic Sky High Background
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+      skyGrad.addColorStop(0, '#040612');
+      skyGrad.addColorStop(0.45, '#070b1c');
+      skyGrad.addColorStop(0.85, '#0c1328');
+      skyGrad.addColorStop(1, '#050711');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Distant mountain silhouette in the lower third
+      ctx.fillStyle = '#03050c';
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      ctx.lineTo(0, h * 0.88);
+      ctx.lineTo(w * 0.15, h * 0.83);
+      ctx.lineTo(w * 0.32, h * 0.89);
+      ctx.lineTo(w * 0.50, h * 0.81);
+      ctx.lineTo(w * 0.68, h * 0.87);
+      ctx.lineTo(w * 0.85, h * 0.82);
+      ctx.lineTo(w, h * 0.88);
+      ctx.lineTo(w, h);
+      ctx.closePath();
+      ctx.fill();
+
+      // Atmospheric horizon mist glow
+      const mistGrad = ctx.createLinearGradient(0, h * 0.75, 0, h);
+      mistGrad.addColorStop(0, 'rgba(0, 160, 255, 0.0)');
+      mistGrad.addColorStop(0.5, 'rgba(0, 160, 255, 0.08)');
+      mistGrad.addColorStop(1, 'rgba(0, 0, 0, 0.4)');
+      ctx.fillStyle = mistGrad;
+      ctx.fillRect(0, h * 0.75, w, h * 0.25);
+    }
+
+    // Twinkling stars
+    for (const s of this.stars) {
+      s.twinklePhase += 0.03;
+      const alpha = s.baseAlpha * (0.7 + Math.sin(s.twinklePhase) * 0.3);
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+      ctx.beginPath();
+      ctx.arc(s.x * w, s.y * h, s.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Heavy cinematic edge vignette
+    const vignette = ctx.createRadialGradient(cx, cy, Math.min(w, h) * 0.35, cx, cy, Math.max(w, h) * 0.72);
+    vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    vignette.addColorStop(0.7, 'rgba(0, 0, 0, 0.45)');
+    vignette.addColorStop(1, 'rgba(0, 0, 0, 0.88)');
+    ctx.fillStyle = vignette;
+    ctx.globalAlpha = 1.0;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.restore();
+  }
+
+  /**
+   * After Effects Audio Spectrum: Symmetrical Radial Analog Lines
+   * Focused on 45 Hz - 3500 Hz for intense, synchronized dance motion!
    */
   drawRadialSpectrum(freqData, subBass) {
     const ctx = this.ctx;
@@ -240,17 +348,18 @@ export class NCSVisualizer {
     const halfCount = count / 2;
     const binCount = freqData.length;
 
-    // Symmetrical frequency bar calculation with perceptual distribution
+    // Symmetrical frequency bar calculation (45 Hz to 3500 Hz)
+    const minBin = 2; // ~45 Hz
+    const maxBin = Math.floor(binCount * 0.42); // ~3500 Hz
+
     for (let i = 0; i < count; i++) {
       const symIndex = i < halfCount ? i : (count - 1 - i);
       const frac = symIndex / halfCount; // 0 (bottom/bass) to 1 (top/treble)
 
-      // Perceptual bin index: concentrates low bins for bass punch
-      const minBin = 2;
-      const maxBin = Math.floor(binCount * 0.72);
-      const binIdx = Math.floor(minBin + Math.pow(frac, 2.0) * (maxBin - minBin));
+      // Perceptual distribution matching After Effects Audio Spectrum
+      const binIdx = Math.floor(minBin + Math.pow(frac, 1.7) * (maxBin - minBin));
 
-      // 3-bin average for silky-smooth response
+      // 3-bin average for smooth analog line spikes
       let valSum = 0;
       const sampleSpread = 2;
       for (let s = -sampleSpread; s <= sampleSpread; s++) {
@@ -259,40 +368,34 @@ export class NCSVisualizer {
       }
       let rawVal = (valSum / (sampleSpread * 2 + 1)) / 255.0;
 
-      // Equal loudness compensation curve
-      const trebleBoost = 1.0 + frac * 0.9;
-      rawVal = Math.min(1.0, rawVal * trebleBoost);
+      // Equal loudness curve compensation
+      const eqBoost = 1.0 + frac * 0.95;
+      rawVal = Math.min(1.0, rawVal * eqBoost);
 
       // Fast explosive attack & smooth release
       if (rawVal > this.barEnergies[i]) {
-        this.barEnergies[i] = this.barEnergies[i] * 0.18 + rawVal * 0.82;
+        this.barEnergies[i] = this.barEnergies[i] * 0.16 + rawVal * 0.84;
       } else {
         this.barEnergies[i] = this.barEnergies[i] * 0.84 + rawVal * 0.16;
-      }
-
-      // Track floating peak caps
-      if (this.barEnergies[i] > this.barPeaks[i]) {
-        this.barPeaks[i] = this.barEnergies[i];
-      } else {
-        this.barPeaks[i] = Math.max(0, this.barPeaks[i] - 0.012);
       }
     }
 
     ctx.save();
     ctx.lineCap = 'round';
 
-    const maxBarLength = this.baseRadius * 1.25;
-    const barWidth = Math.max(2.4, (2 * Math.PI * this.currentRadius / count) * 0.62);
+    const maxBarLength = this.baseRadius * 1.35;
+    // Crisp, sharp analog line width
+    const barWidth = Math.max(2.2, (2 * Math.PI * this.currentRadius / count) * 0.58);
     ctx.lineWidth = barWidth;
 
     const angleStep = (Math.PI * 2) / count;
 
-    // 1. Draw Individual Radial Spikes
+    // Draw Individual Radial Analog Lines (No outer envelope curve!)
     for (let i = 0; i < count; i++) {
       const energy = this.barEnergies[i];
-      const barHeight = Math.pow(energy, 1.2) * maxBarLength + 4;
+      const barHeight = Math.pow(energy, 1.25) * maxBarLength + 4;
 
-      // Angle: 0 starts at bottom center (Math.PI / 2)
+      // 0 starts at bottom center (Math.PI / 2)
       const angle = (i * angleStep) + (Math.PI / 2);
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
@@ -302,65 +405,21 @@ export class NCSVisualizer {
       const endX = cx + cos * (this.currentRadius + barHeight);
       const endY = cy + sin * (this.currentRadius + barHeight);
 
-      // Glowing multi-color gradient from primary to glow accent
+      // Analog line color: White/Bright core at base, fading to Neon Electric Gold/Amber
       const barGrad = ctx.createLinearGradient(startX, startY, endX, endY);
-      barGrad.addColorStop(0, this.primaryColor);
-      barGrad.addColorStop(0.7, this.primaryColor);
+      barGrad.addColorStop(0, '#ffffff');
+      barGrad.addColorStop(0.3, this.primaryColor);
       barGrad.addColorStop(1, this.glowColor);
 
       ctx.strokeStyle = barGrad;
       ctx.shadowColor = this.primaryColor;
-      ctx.shadowBlur = 14 + energy * 12;
+      ctx.shadowBlur = 12 + energy * 16;
 
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
       ctx.stroke();
-
-      // Peak Cap Dot
-      const peakEnergy = this.barPeaks[i];
-      if (peakEnergy > 0.08) {
-        const peakHeight = Math.pow(peakEnergy, 1.2) * maxBarLength + 6;
-        const peakX = cx + cos * (this.currentRadius + peakHeight);
-        const peakY = cy + sin * (this.currentRadius + peakHeight);
-
-        ctx.fillStyle = this.glowColor;
-        ctx.shadowColor = this.glowColor;
-        ctx.shadowBlur = 10;
-        ctx.beginPath();
-        ctx.arc(peakX, peakY, Math.max(1.2, barWidth * 0.42), 0, Math.PI * 2);
-        ctx.fill();
-      }
     }
-
-    // 2. Smooth Continuous Envelope Line connecting bar tips
-    ctx.shadowBlur = 22;
-    ctx.shadowColor = this.primaryColor;
-    ctx.lineWidth = 2.0;
-    ctx.strokeStyle = this.primaryColor;
-    ctx.beginPath();
-
-    for (let i = 0; i < count; i++) {
-      const energy = this.barEnergies[i];
-      const barHeight = Math.pow(energy, 1.2) * maxBarLength + 4;
-      const angle = (i * angleStep) + (Math.PI / 2);
-      const tx = cx + Math.cos(angle) * (this.currentRadius + barHeight);
-      const ty = cy + Math.sin(angle) * (this.currentRadius + barHeight);
-
-      if (i === 0) {
-        ctx.moveTo(tx, ty);
-      } else {
-        const prevAngle = ((i - 1) * angleStep) + (Math.PI / 2);
-        const prevHeight = Math.pow(this.barEnergies[i - 1], 1.2) * maxBarLength + 4;
-        const ptx = cx + Math.cos(prevAngle) * (this.currentRadius + prevHeight);
-        const pty = cy + Math.sin(prevAngle) * (this.currentRadius + prevHeight);
-        const mx = (ptx + tx) / 2;
-        const my = (pty + ty) / 2;
-        ctx.quadraticCurveTo(ptx, pty, mx, my);
-      }
-    }
-    ctx.closePath();
-    ctx.stroke();
 
     ctx.restore();
   }
@@ -375,10 +434,10 @@ export class NCSVisualizer {
     ctx.save();
 
     // 1. Concentrated Ambient Bass Glow behind the circle (breathing with rhythm)
-    const haloRadius = r * (1.15 + subBass * 0.45);
+    const haloRadius = r * (1.18 + subBass * 0.45);
     const haloGrad = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, haloRadius);
     haloGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    haloGrad.addColorStop(0.4, this.primaryColor + '40');
+    haloGrad.addColorStop(0.4, this.primaryColor + '44');
     haloGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
     ctx.fillStyle = haloGrad;
@@ -386,11 +445,13 @@ export class NCSVisualizer {
     ctx.arc(cx, cy, haloRadius, 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. High-intensity Outer Neon Ring Glow
+    // 2. High-intensity Outer Neon Glow Bloom
     ctx.shadowColor = this.primaryColor;
     ctx.shadowBlur = 24 + subBass * 32;
+
+    // Razor-sharp pure white circular disc rim (signature After Effects circle style)
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 4.5;
+    ctx.lineWidth = 4.0;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.stroke();
@@ -433,8 +494,8 @@ export class NCSVisualizer {
   render(audioMetrics) {
     const { freqData, subBass, kickPeak } = audioMetrics;
 
-    // Spring-damper physics for natural bouncy 4-on-the-floor pulsation:
-    const targetRadius = this.baseRadius * (1.0 + Math.pow(subBass, 1.8) * 0.42);
+    // Authentic Progressive House 4-on-the-floor spring bounce:
+    const targetRadius = this.baseRadius * (1.0 + Math.pow(subBass, 1.7) * 0.42);
     const displacement = targetRadius - this.currentRadius;
     const springStiffness = 0.28;
     const damping = 0.72;
@@ -443,7 +504,7 @@ export class NCSVisualizer {
     this.radiusVelocity *= damping;
     this.currentRadius += this.radiusVelocity;
 
-    // Eject shockwaves & particles on kick transients
+    // Trigger shockwaves & particles on kick transients
     if (kickPeak) {
       this.triggerShockwave(subBass);
       this.spawnBassExplosion(subBass);
@@ -451,38 +512,21 @@ export class NCSVisualizer {
       this.spawnBassExplosion(subBass * 0.7);
     }
 
-    // Ambient floating stardust drift
-    if (Math.random() < 0.35) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = this.baseRadius * 1.35 + Math.random() * (Math.min(this.width, this.height) * 0.42);
-      this.particles.push({
-        x: this.width / 2 + Math.cos(angle) * dist,
-        y: this.height / 2 + Math.sin(angle) * dist,
-        vx: (Math.random() - 0.5) * 0.6,
-        vy: (Math.random() - 0.5) * 0.6 - 0.2,
-        alpha: 0.65,
-        decay: 0.006,
-        size: 1.2 + Math.random() * 2.0,
-        color: Math.random() > 0.5 ? this.primaryColor : this.glowColor
-      });
-    }
+    // 1. Draw Atmospheric Background with Bass Zoom
+    this.drawBackground(subBass);
 
-    // Clear background to rich obsidian dark
-    this.ctx.fillStyle = '#050508';
-    this.ctx.fillRect(0, 0, this.width, this.height);
-
-    // 1. Shockwaves
+    // 2. Shockwaves
     this.updateShockwaves();
     this.drawShockwaves();
 
-    // 2. Bass Particles
+    // 3. Bass Particles
     this.updateParticles();
     this.drawParticles();
 
-    // 3. Radial Spectrum Bars
+    // 4. Symmetrical Radial Analog Lines (After Effects style)
     this.drawRadialSpectrum(freqData, subBass);
 
-    // 4. Center Disc
+    // 5. Center Disc
     this.drawCenterCircle(subBass);
   }
 }
