@@ -217,24 +217,28 @@ audioFileInput.addEventListener('change', (e) => {
 });
 
 // Custom Cover Image Input
-coverFileInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (file && file.type.startsWith('image/')) {
-    const url = URL.createObjectURL(file);
-    visualizer.setCoverArt(url);
-    showToast("Cover-Bild erfolgreich gesetzt!");
-  }
-});
+if (coverFileInput) {
+  coverFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      visualizer.setCoverArt(url);
+      showToast("Cover-Bild erfolgreich gesetzt!");
+    }
+  });
+}
 
 // Custom Background Image Input
-bgFileInput.addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  if (file && file.type.startsWith('image/')) {
-    const url = URL.createObjectURL(file);
-    visualizer.setBackgroundArt(url);
-    showToast("Hintergrund-Bild gesetzt!");
-  }
-});
+if (bgFileInput) {
+  bgFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      visualizer.setBackgroundArt(url);
+      showToast("Hintergrund-Bild gesetzt!");
+    }
+  });
+}
 
 // 3. Microphone / Live Room Audio Input
 micBtn.addEventListener('click', async () => {
