@@ -72,6 +72,10 @@ export class NCSVisualizer {
     // In this 3D undulating particle mesh style, the interior is open 3D particle space
   }
 
+  setDefaultLogo() {
+    // In this 3D undulating particle mesh style, the interior is open 3D particle space
+  }
+
   setBackgroundArt(url) {
     if (this.bgLayer) {
       if (url) {

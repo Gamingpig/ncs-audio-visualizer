@@ -83,9 +83,9 @@ audioEngine.onTrackChange = (meta) => {
   trackTitle.textContent = meta.title;
   trackArtist.textContent = meta.artist;
   if (meta.cover) {
-    visualizer.setCoverArt(meta.cover);
+    if (typeof visualizer.setCoverArt === 'function') visualizer.setCoverArt(meta.cover);
   } else {
-    visualizer.setDefaultLogo();
+    if (typeof visualizer.setDefaultLogo === 'function') visualizer.setDefaultLogo();
   }
 };
 
