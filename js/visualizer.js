@@ -170,13 +170,16 @@ export class NCSVisualizer {
       const x0 = (u * 1.05 + Math.sin(v * 2.2) * 0.14) * R;
       const y0 = (v * 1.00 - Math.cos(u * 1.8) * 0.12) * R;
 
-      // Central S-curve spine & audio displacement with Turbulent Noise
+      // Central S-curve spine & audio displacement with Snappy Elastic Response
       const turb = Math.sin(u * 2.0 + this.audioPhase * 0.5) * Math.cos(v * 2.0 - this.audioPhase * 0.5);
       const spineU = 0.32 * Math.sin(v * 2.5 - this.audioPhase * 1.8);
       const uDiff = u - spineU;
-      const ridge = Math.exp(-(uDiff * uDiff) / 0.10) * R * (0.08 + subBass * 0.62 + freqVal * 0.24);
-      const wave = turb * (R * 0.15 * (1 + subBass));
-      const z0 = ridge + wave + (kickPeak ? Math.sin(d * 8.0 - this.audioPhase * 6.0) * (R * 0.20) * subBass : 0);
+      
+      // Elastic Envelope: Sharp reaction to kickPeak, smooth decay for synths
+      const snap = kickPeak ? 1.5 : 1.0;
+      const ridge = Math.exp(-(uDiff * uDiff) / 0.10) * R * (0.08 + subBass * 0.62 * snap + freqVal * 0.24);
+      const wave = turb * (R * 0.15 * (1 + subBass * snap));
+      const z0 = ridge + wave;
 
       // 3D Euler Transformation (Yaw -> Pitch -> Roll)
       const x1 = x0 * cosY + z0 * sinY;
@@ -278,15 +281,10 @@ export class NCSVisualizer {
     // -----------------------------------------------------------------
     // RENDER PASS 1: Subtle Vignette & Outer Neon Aura (Transparent to Stars)
     // -----------------------------------------------------------------
-    // A. Soft subtle vignette (transparent so starry sky shines through)
-    const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-    coreGrad.addColorStop(0.00, 'rgba(2, 4, 10, 0.25)');
-    coreGrad.addColorStop(0.70, 'rgba(3, 6, 14, 0.40)');
-    coreGrad.addColorStop(1.00, 'rgba(5, 8, 20, 0.05)');
-    ctx.fillStyle = coreGrad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, R, 0, Math.PI * 2);
-    ctx.fill();
+    // A. Transparent cosmic center: Remove opaque fill (Render Pass 1, part A)
+    // Removed coreGrad.addColorStop(0.00, 'rgba(2, 4, 10, 0.25)'); 
+    // Allowing the starry bgLayer to shine through completely.
+    ctx.clearRect(cx - R, cy - R, R * 2, R * 2);
 
     // B. Atmospheric yellow bloom radiating outward into starry desert night
     const bloomGrad = ctx.createRadialGradient(cx, cy, R * 0.90, cx, cy, R * 1.45);
