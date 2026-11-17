@@ -282,15 +282,16 @@ export class NCSVisualizer {
       const cosA = this.rimCos[k];
       const sinA = this.rimSin[k];
       const sVal = spatiallySmoothed[k];
+      const angle = (k / this.rimSegments) * Math.PI * 2;
 
-      // Dynamic reactive thickness:
-      // Organic harmonic undulation scaled directly by live music energy
-      const fluidHarmonic = Math.sin(k * 0.22 - this.audioPhase * 2.5) * (18 * subBass) +
-                            Math.cos(k * 0.38 + this.audioPhase * 1.8) * (12 * (sVal + 0.1));
+      // 100% Seamless integer harmonics around the 360° circle (zero phase jump at seam)
+      const fluidHarmonic = Math.sin(angle * 2.0 - this.audioPhase * 2.2) * (18 * subBass) +
+                            Math.cos(angle * 3.0 + this.audioPhase * 1.6) * (14 * (sVal + 0.12)) +
+                            Math.sin(angle * 4.0 - this.audioPhase * 3.0) * (8 * (sVal + 0.05));
 
-      const rOuter = R + (sVal * 12) + (subBass * 12);
-      const thickness = 20 + (sVal * 80) + (subBass * 42) + fluidHarmonic;
-      const rInner = Math.max(R * 0.52, rOuter - thickness);
+      const rOuter = R + (sVal * 12) + (subBass * 10);
+      const thickness = 22 + (sVal * 75) + (subBass * 40) + fluidHarmonic;
+      const rInner = Math.max(R * 0.54, rOuter - thickness);
 
       outerPtsX[k] = cx + cosA * rOuter;
       outerPtsY[k] = cy + sinA * rOuter;
