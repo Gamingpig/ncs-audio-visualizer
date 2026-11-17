@@ -1,7 +1,7 @@
-import { AudioEngine } from './audio.js?v=3.2';
-import { NCSVisualizer } from './visualizer.js?v=3.2';
-import { SpotifyAuth } from './spotify.js?v=3.2';
-import { extractMetadata } from './id3.js?v=3.2';
+import { AudioEngine } from './audio.js?v=4.0';
+import { NCSVisualizer } from './visualizer.js?v=4.0';
+import { SpotifyAuth } from './spotify.js?v=4.0';
+import { extractMetadata } from './id3.js?v=4.0';
 
 // DOM Elements
 const canvas = document.getElementById('visualizerCanvas');
