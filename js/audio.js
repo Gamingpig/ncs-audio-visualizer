@@ -337,8 +337,8 @@ export class AudioEngine {
 
     if (this.onTrackChange) {
       this.onTrackChange({
-        title: "Sky High (128 BPM Progressive House)",
-        artist: "Elektronomia Style Melodic Synthesizer",
+        title: "Elektronomia",
+        artist: "Sky High",
         cover: null
       });
     }

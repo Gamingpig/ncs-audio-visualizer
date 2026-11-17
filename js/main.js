@@ -1,7 +1,7 @@
-import { AudioEngine } from './audio.js?v=2.2';
-import { NCSVisualizer } from './visualizer.js?v=2.2';
-import { SpotifyAuth } from './spotify.js?v=2.2';
-import { extractMetadata } from './id3.js?v=2.2';
+import { AudioEngine } from './audio.js?v=3.0';
+import { NCSVisualizer } from './visualizer.js?v=3.0';
+import { SpotifyAuth } from './spotify.js?v=3.0';
+import { extractMetadata } from './id3.js?v=3.0';
 
 // DOM Elements
 const canvas = document.getElementById('visualizerCanvas');
@@ -373,3 +373,42 @@ document.querySelectorAll('.color-dot').forEach(btn => {
     document.documentElement.style.setProperty('--glow-color', glow);
   });
 });
+
+// 9. NCS Logo Visibility Toggle
+const logoToggleBtn = document.getElementById('logoToggleBtn');
+const heroLogoBox = document.getElementById('heroLogoBox');
+if (logoToggleBtn && heroLogoBox) {
+  logoToggleBtn.addEventListener('click', () => {
+    heroLogoBox.classList.toggle('hidden');
+    const isHidden = heroLogoBox.classList.contains('hidden');
+    logoToggleBtn.classList.toggle('active', !isHidden);
+    showToast(isHidden ? "NCS Logo ausgeblendet (Player Modus)" : "NCS Video Logo eingeblendet (1:1 Video Modus)");
+  });
+}
+
+// 10. Cinema Auto-Hide Mode (Hides UI after 3.5s of inactivity like a YouTube video)
+const topBar = document.getElementById('topBar');
+const controlsBar = document.getElementById('controlsBar');
+let uiHideTimer = null;
+
+function wakeUI() {
+  if (topBar) topBar.classList.remove('ui-faded');
+  if (controlsBar) controlsBar.classList.remove('ui-faded');
+  if (filePlayerBar) filePlayerBar.classList.remove('ui-faded');
+
+  clearTimeout(uiHideTimer);
+  uiHideTimer = setTimeout(() => {
+    const modalOpen = !document.getElementById('spotifyModal')?.classList.contains('hidden');
+    if (!modalOpen) {
+      if (topBar) topBar.classList.add('ui-faded');
+      if (controlsBar) controlsBar.classList.add('ui-faded');
+      if (filePlayerBar) filePlayerBar.classList.add('ui-faded');
+    }
+  }, 4000);
+}
+
+window.addEventListener('mousemove', wakeUI);
+window.addEventListener('mousedown', wakeUI);
+window.addEventListener('keydown', wakeUI);
+window.addEventListener('touchstart', wakeUI);
+wakeUI();
