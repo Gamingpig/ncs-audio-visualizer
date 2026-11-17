@@ -2,14 +2,12 @@
  * 3D Particle Wave Lattice & Fluid Molten Ribbon Visualizer
  * Exact 1:1 recreation of "Elektronomia - Sky High" (Trapcode Form in After Effects):
  *
- * 1. Dramatic 3D Saddle Wave: Large, flowing wave trough swooping through the center
- *    and rising into luminous wave crests, matching the video's dramatic 3D volume.
- * 2. High-Density Particle Stream: 80x80 (6400) luminous dots forming dense glowing
- *    filaments and wave ridges, without harsh graph-paper crosshatch lines.
- * 3. 100% Silky Liquid Molten Outer Ribbon: Smooth Catmull-Rom spline curves with
- *    multi-harmonic wave synthesis, eliminating all jagged polygon teeth.
- * 4. Additive Neon Bloom ('lighter'): Intense electric yellow (#ffe800) and golden amber (#ffbb00).
- * 5. 1:1 Desktop Composition: Positioned in the right 60% of the widescreen frame.
+ * 1. Volumetric Dark Cosmic Core: Enhances particle contrast against the starry background.
+ * 2. Atmospheric Neon Bloom: Golden radiant aura emitting into the surrounding night sky.
+ * 3. Centered 3D Saddle Wave: Flowing 3D wave volume filling the sphere gracefully.
+ * 4. 80x80 High-Density Particle Stream: Dense luminous dots forming glowing filaments.
+ * 5. 100% Silky Liquid Molten Ribbon: Smooth Catmull-Rom spline curves with multi-layer neon glow.
+ * 6. Additive Hardware Blending ('lighter'): Blinding electric neon yellow (#ffe800) and golden amber (#ffbb00).
  */
 export class NCSVisualizer {
   constructor(canvas) {
@@ -61,14 +59,14 @@ export class NCSVisualizer {
 
     // Signature Elektronomia Electric Yellow Theme
     this.primaryColor = '#ffe800';
-    this.glowColor = '#ffb300';
+    this.glowColor = '#ffaa00';
     this.coreColor = '#ffffff';
 
     // 3D Camera Angles matching TW9d8vYrVFQ
-    this.rotX = 0.42;   // Looking down into the rolling wave valley
-    this.rotY = -0.32;  // Angled towards the viewer from the right
-    this.rotZ = 0.10;   // Diagonal tilt matching the Milky Way angle
-    this.fov = 720;
+    this.rotX = 0.36;   // Looking down into the rolling wave valley
+    this.rotY = -0.22;  // Angled towards the viewer from the right
+    this.rotZ = 0.06;   // Subtle cinematic roll
+    this.fov = 740;
 
     this.time = 0;
     this.bgLayer = document.getElementById('bgLayer');
@@ -158,33 +156,32 @@ export class NCSVisualizer {
         const v = this.vCoord[p];
         const d = this.distFromCenter[p];
 
-        // Sample audio spectrum (bass in center/left, treble on periphery)
+        // Sample audio spectrum (bass in center, highs on edges)
         const freqIdx = Math.floor(2 + (d * 0.65 + (u * 0.15 + 0.15)) * (binCount * 0.4));
         const freqVal = (freqData[Math.min(binCount - 1, Math.max(0, freqIdx))] || 0) / 255.0;
 
-        // Signature Dramatic 3D Saddle Wave Displacement (TW9d8vYrVFQ):
-        // 1. Deep swooping diagonal wave valley
-        const waveSaddle = Math.sin(u * 1.8 - v * 2.2 + 0.4) * (85 * (subBass + 0.45));
-        // 2. Rolling traveling wave ridges
-        const waveRoll = Math.sin(u * 3.4 + v * 2.6 - this.time * 2.6) * (50 * (1.0 - d * 0.3));
-        // 3. Audio frequency reaction & bass impact ripple
-        const waveRipple = Math.sin(d * 10.0 - this.time * 4.0) * (36 * kickPeak);
-        const waveAudio = freqVal * 55;
-        // 4. Spherical bowl displacement
-        const zBowl = - (1.0 - d * d) * (45 + subBass * 25);
+        // Signature Elektronomia 3D Waves:
+        // 1. Rolling traveling wave ridges
+        const wave1 = Math.sin(u * 2.6 + v * 1.8 - this.time * 2.5) * (65 * (subBass + 0.4));
+        // 2. Harmonic cross-undulation
+        const wave2 = Math.cos(u * 2.0 - v * 2.4 + this.time * 1.8) * (38 * (1.0 - d * 0.3));
+        // 3. Center bass-kick impact ripple
+        const wave3 = Math.sin(d * 8.5 - this.time * 4.0) * (32 * kickPeak);
+        // 4. Subtle saddle wave curvature
+        const waveSaddle = (u * u - v * v) * (35 * (subBass + 0.3));
+        // 5. Audio frequency displacement & spherical bowl
+        const zAudio = freqVal * 50;
+        const zBowl = - (1.0 - d * d) * (35 + subBass * 20);
 
         const x0 = u * R;
         const y0 = v * R;
-        const z0 = zBowl + waveSaddle + waveRoll + waveRipple + waveAudio;
+        const z0 = zBowl + wave1 + wave2 + wave3 + waveSaddle + zAudio;
 
-        // 3D Euler Rotation (Yaw -> Pitch -> Roll)
-        // Y-axis
+        // 3D Euler Rotation
         const x1 = x0 * cosY + z0 * sinY;
         const z1 = -x0 * sinY + z0 * cosY;
-        // X-axis
         const y2 = y0 * cosX - z1 * sinX;
         const z2 = y0 * sinX + z1 * cosX;
-        // Z-axis
         const xRot = x1 * cosZ - y2 * sinZ;
         const yRot = x1 * sinZ + y2 * cosZ;
         const zRot = z2;
@@ -208,17 +205,15 @@ export class NCSVisualizer {
     // -----------------------------------------------------------------
     // 2. COMPUTE SILKY SMOOTH FLUID OUTER RIBBON
     // -----------------------------------------------------------------
-    // Wide moving-average smoothing of frequencies across the 180 angles
     for (let k = 0; k < this.rimSegments; k++) {
       const symK = k < 90 ? k : (179 - k);
       const binIdx = Math.floor(2 + (symK / 90) * (binCount * 0.4));
       const rawVal = (freqData[binIdx] || 0) / 255.0;
 
-      // Temporal smooth
       this.smoothFreq[k] = this.smoothFreq[k] * 0.75 + rawVal * 0.25;
     }
 
-    // Secondary spatial Gaussian pass over the 180 points to remove any polygonal edges
+    // Secondary spatial Gaussian pass over the 180 points
     const spatiallySmoothed = new Float32Array(this.rimSegments);
     for (let k = 0; k < this.rimSegments; k++) {
       let sum = 0;
@@ -259,13 +254,36 @@ export class NCSVisualizer {
     // Clear canvas
     ctx.clearRect(0, 0, w, h);
 
+    // -----------------------------------------------------------------
+    // PRE-PASS: Soft Dark Cosmic Core inside Sphere for High Contrast
+    // -----------------------------------------------------------------
+    const darkCore = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.05);
+    darkCore.addColorStop(0, 'rgba(2, 4, 12, 0.65)');
+    darkCore.addColorStop(0.75, 'rgba(2, 4, 12, 0.45)');
+    darkCore.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = darkCore;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 1.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    // -----------------------------------------------------------------
+    // PRE-PASS 2: Atmospheric Diffuse Volumetric Bloom Aura into Space
+    // -----------------------------------------------------------------
+    const outerBloom = ctx.createRadialGradient(cx, cy, R * 0.88, cx, cy, R * 1.35);
+    outerBloom.addColorStop(0, 'rgba(255, 232, 0, 0.18)');
+    outerBloom.addColorStop(0.5, 'rgba(255, 170, 0, 0.08)');
+    outerBloom.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = outerBloom;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 1.35, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.save();
     ctx.globalCompositeOperation = 'lighter'; // GPU Additive Neon Bloom
 
     // -----------------------------------------------------------------
     // RENDER PASS 1: The Molten Fluid Liquid Ribbon (Silky Spline)
     // -----------------------------------------------------------------
-    // Helper function for drawing smooth closed Catmull-Rom spline curves
     const drawSmoothLoop = (ptsX, ptsY, reverse = false) => {
       const len = ptsX.length;
       const getPt = (idx) => {
@@ -285,7 +303,6 @@ export class NCSVisualizer {
         const [x2, y2] = getPt(reverse ? i - 1 : i + 1);
         const [x3, y3] = getPt(reverse ? i - 2 : i + 2);
 
-        // Catmull-Rom to Cubic Bezier control points
         const cp1x = x1 + (x2 - x0) / 6;
         const cp1y = y1 + (y2 - y0) / 6;
         const cp2x = x2 - (x3 - x1) / 6;
@@ -344,12 +361,12 @@ export class NCSVisualizer {
     ctx.stroke();
 
     // -----------------------------------------------------------------
-    // RENDER PASS 2: Flowing 3D Wave Filaments (Along the Wave Ridges)
+    // RENDER PASS 2: Flowing 3D Wave Lattice Filaments
     // -----------------------------------------------------------------
-    // Connect points along the wave flow direction (rows) to form flowing ribbons
     ctx.strokeStyle = this.primaryColor;
     ctx.lineWidth = 0.85;
 
+    // Longitudinal flow lines along rows
     for (let j = 0; j < this.gridSize; j += 2) {
       let drawing = false;
       ctx.beginPath();
@@ -369,6 +386,31 @@ export class NCSVisualizer {
         }
       }
       ctx.globalAlpha = 0.25 + subBass * 0.25;
+      ctx.stroke();
+    }
+
+    // Subtle latitudinal cross lines along columns
+    ctx.strokeStyle = this.glowColor;
+    ctx.lineWidth = 0.65;
+    for (let i = 0; i < this.gridSize; i += 3) {
+      let drawing = false;
+      ctx.beginPath();
+      for (let j = 0; j < this.gridSize; j++) {
+        const idx = j * this.gridSize + i;
+        if (this.isInside[idx] && this.screenAlpha[idx] > 0.08) {
+          const px = this.screenX[idx];
+          const py = this.screenY[idx];
+          if (!drawing) {
+            ctx.moveTo(px, py);
+            drawing = true;
+          } else {
+            ctx.lineTo(px, py);
+          }
+        } else {
+          drawing = false;
+        }
+      }
+      ctx.globalAlpha = 0.15 + subBass * 0.18;
       ctx.stroke();
     }
 

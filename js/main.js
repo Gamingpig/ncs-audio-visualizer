@@ -1,7 +1,7 @@
-import { AudioEngine } from './audio.js?v=3.1';
-import { NCSVisualizer } from './visualizer.js?v=3.1';
-import { SpotifyAuth } from './spotify.js?v=3.1';
-import { extractMetadata } from './id3.js?v=3.1';
+import { AudioEngine } from './audio.js?v=3.2';
+import { NCSVisualizer } from './visualizer.js?v=3.2';
+import { SpotifyAuth } from './spotify.js?v=3.2';
+import { extractMetadata } from './id3.js?v=3.2';
 
 // DOM Elements
 const canvas = document.getElementById('visualizerCanvas');
@@ -150,6 +150,12 @@ function animate() {
   requestAnimationFrame(animate);
   const metrics = audioEngine.update();
   visualizer.render(metrics);
+
+  // Subtle live punch on the hero logo on kick hits
+  if (heroLogoBox) {
+    const punch = 1.0 + Math.pow(metrics.subBass, 2.2) * 0.055;
+    heroLogoBox.style.transform = `scale(${punch})`;
+  }
 }
 requestAnimationFrame(animate);
 

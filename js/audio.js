@@ -436,57 +436,82 @@ export class AudioEngine {
     };
 
     const playEuphoricLead = (time, freq) => {
-      const osc = this.audioCtx.createOscillator();
+      // Layered Supersaw Synthesizer (3 detuned saw oscillators)
+      const osc1 = this.audioCtx.createOscillator();
       const osc2 = this.audioCtx.createOscillator();
+      const osc3 = this.audioCtx.createOscillator();
       const gain = this.audioCtx.createGain();
       const filter = this.audioCtx.createBiquadFilter();
 
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(freq, time);
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(freq, time);
 
       osc2.type = 'sawtooth';
-      osc2.frequency.setValueAtTime(freq * 1.006, time);
+      osc2.frequency.setValueAtTime(freq * 1.008, time); // Detuned sharp
+
+      osc3.type = 'sawtooth';
+      osc3.frequency.setValueAtTime(freq * 0.992, time); // Detuned flat
 
       filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(3200, time);
-      filter.frequency.exponentialRampToValueAtTime(1400, time + 0.25);
+      filter.frequency.setValueAtTime(4200, time);
+      filter.frequency.exponentialRampToValueAtTime(1800, time + 0.24);
 
-      gain.gain.setValueAtTime(0.18, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.26);
+      gain.gain.setValueAtTime(0.24, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
 
-      osc.connect(filter);
+      osc1.connect(filter);
       osc2.connect(filter);
+      osc3.connect(filter);
       filter.connect(gain);
       gain.connect(synthMasterGain);
 
-      osc.start(time);
+      osc1.start(time);
       osc2.start(time);
-      osc.stop(time + 0.26);
-      osc2.stop(time + 0.26);
+      osc3.start(time);
+      osc1.stop(time + 0.25);
+      osc2.stop(time + 0.25);
+      osc3.stop(time + 0.25);
     };
 
+    // Authentic Elektronomia - Sky High Melodic Hook (32 Steps in F# Minor)
     const melodyPattern = [
-      466.16, 554.37, 622.25, 466.16,
-      554.37, 622.25, 466.16, 415.30,
-      369.99, 415.30, 466.16, 369.99,
-      415.30, 466.16, 554.37, 622.25
+      // Bar 1 (F#m -> D)
+      554.37, 554.37, 554.37, 493.88,
+      440.00, 440.00, 369.99, 440.00,
+      554.37, 554.37, 659.25, 659.25,
+      659.25, 659.25, 587.33, 554.37,
+      // Bar 2 (A -> E)
+      587.33, 587.33, 554.37, 493.88,
+      415.30, 415.30, 440.00, 493.88,
+      554.37, 554.37, 440.00, 440.00,
+      369.99, 369.99, 369.99, 369.99
     ];
 
-    const bassNotes = [155.56, 155.56, 185.00, 185.00, 138.59, 138.59, 207.65, 207.65];
+    // F#m -> D -> A -> E Bassline
+    const bassProgression = [
+      92.50, 92.50, 92.50, 92.50, 92.50, 92.50, 92.50, 92.50,  // F#
+      73.42, 73.42, 73.42, 73.42, 73.42, 73.42, 73.42, 73.42,  // D
+      110.00, 110.00, 110.00, 110.00, 110.00, 110.00, 110.00, 110.00, // A
+      82.41, 82.41, 82.41, 82.41, 82.41, 82.41, 82.41, 82.41   // E
+    ];
 
     let nextNoteTime = this.audioCtx.currentTime + 0.05;
     this.demoInterval = setInterval(() => {
       while (nextNoteTime < this.audioCtx.currentTime + 0.1) {
         const beatStep = step % 16;
+        const songStep = step % 32;
 
+        // 4-on-the-Floor Kick & Offbeat Hats
         if (beatStep % 4 === 0) playHouseKick(nextNoteTime);
         if (beatStep % 4 === 2) playOpenHat(nextNoteTime);
         if (beatStep === 4 || beatStep === 12) playClap(nextNoteTime);
 
-        const bassFreq = bassNotes[(step >> 2) % bassNotes.length];
+        // Sidechain-pumping bassline
+        const bassFreq = bassProgression[songStep];
         playBassNote(nextNoteTime, bassFreq);
 
-        const leadFreq = melodyPattern[step % melodyPattern.length];
+        // Lead Melody
+        const leadFreq = melodyPattern[songStep];
         playEuphoricLead(nextNoteTime, leadFreq);
 
         nextNoteTime += stepTime;
