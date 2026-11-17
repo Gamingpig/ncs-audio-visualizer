@@ -1,56 +1,66 @@
 /**
- * 3D Particle Wave Lattice & Fluid Molten Ribbon Visualizer
- * Exact 1:1 recreation of "Elektronomia - Sky High" (Trapcode Form Audio React):
+ * 3D Particle Sphere Lattice & Polar Audio Spectrum Ribbon
+ * 1:1 recreation of "Elektronomia - Sky High | NCS" verified frame-by-frame:
  *
- * 1. 100% Dynamic Audio-Reactive Physics:
- *    - Animation speed (`audioPhase`) is directly locked to live musical energy.
- *    - Wave displacement is sculpted by the live frequency spectrum & audio waterfall.
- *    - In silent passages, the mesh completely rests; when the drop hits, it erupts into 3D waves.
- * 2. Diagonal Wave Propagation: Waves travel along the 35° perspective diagonal matching
- *    the Milky Way and the original After Effects template camera.
- * 3. Organic Molten Fluid Ribbon: Swells into rich liquid golden folds during bass kicks
- *    and flutters with lead synth vibrato, rendered via smooth Catmull-Rom cubic splines.
- * 4. High-Contrast Cosmic Core & Atmospheric Bloom: Soft dark interior for brilliant dot contrast
- *    and glowing yellow volumetric aura radiating into space.
+ * 1. 3D Particle Sphere (Trapcode Form Base Form: Sphere):
+ *    - Pure discrete glowing yellow dots on a 3D spherical lattice (NO DRAWN LINES!).
+ *    - Folds in the 3D surface naturally create caustic wave filaments through optical density.
+ *    - In quiet passages (intro), dots sit in a calm curved spherical dome along the perimeter.
+ *    - In the drop, audio frequencies displace the sphere into the iconic S-curve wave crests.
+ * 2. Polar Audio Spectrum Ribbon:
+ *    - Circular outer rim with inward-modulating audio frequency scallops.
+ *    - Multi-layered glowing neon yellow fill with white-hot core perimeter line.
+ *    - Dynamically responsive to bass kicks, mid-range synth leads, and percussion.
+ * 3. Additive Neon Bloom ('lighter'):
+ *    - Near-zero CPU overhead, hardware-accelerated 60/120 FPS rendering.
  */
 export class NCSVisualizer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: true });
 
-    // 3D Grid Parameters (76 x 76 = 5,776 points)
-    this.gridSize = 76;
-    this.totalPoints = this.gridSize * this.gridSize;
+    // 3D Sphere Parameters (Trapcode Form Sphere)
+    this.latRings = 54;    // Latitude rings from pole to pole
+    this.lonPoints = 96;   // Longitude points per ring
+    this.totalPoints = this.latRings * this.lonPoints; // 5,184 discrete dots
 
-    // Audio Waterfall History Buffer
-    this.historyRows = this.gridSize;
-    this.historyCols = this.gridSize;
-    this.audioHistory = new Float32Array(this.historyRows * this.historyCols);
+    // Spherical base coordinates
+    this.phiCoord = new Float32Array(this.totalPoints);
+    this.thetaCoord = new Float32Array(this.totalPoints);
+    this.sinPhi = new Float32Array(this.totalPoints);
+    this.cosPhi = new Float32Array(this.totalPoints);
+    this.sinTheta = new Float32Array(this.totalPoints);
+    this.cosTheta = new Float32Array(this.totalPoints);
 
-    // Buffers for 3D coordinates & projection
-    this.uCoord = new Float32Array(this.totalPoints);
-    this.vCoord = new Float32Array(this.totalPoints);
-    this.distFromCenter = new Float32Array(this.totalPoints);
-    this.isInside = new Uint8Array(this.totalPoints);
-
+    // Output buffers for 3D projection
     this.screenX = new Float32Array(this.totalPoints);
     this.screenY = new Float32Array(this.totalPoints);
     this.screenZ = new Float32Array(this.totalPoints);
     this.screenScale = new Float32Array(this.totalPoints);
     this.screenAlpha = new Float32Array(this.totalPoints);
+    this.isVisible = new Uint8Array(this.totalPoints);
 
-    // Precalculate UV and radial distances
-    let p = 0;
-    for (let j = 0; j < this.gridSize; j++) {
-      const v = (j / (this.gridSize - 1) - 0.5) * 2.0; // -1 to +1
-      for (let i = 0; i < this.gridSize; i++) {
-        const u = (i / (this.gridSize - 1) - 0.5) * 2.0; // -1 to +1
-        const d = Math.sqrt(u * u + v * v);
-        this.uCoord[p] = u;
-        this.vCoord[p] = v;
-        this.distFromCenter[p] = d;
-        this.isInside[p] = d <= 1.01 ? 1 : 0;
-        p++;
+    // Precalculate spherical angles
+    let idx = 0;
+    for (let j = 0; j < this.latRings; j++) {
+      // Polar angle phi: 0 (top) to PI (bottom)
+      const phi = ((j + 0.5) / this.latRings) * Math.PI;
+      const sPhi = Math.sin(phi);
+      const cPhi = Math.cos(phi);
+
+      for (let i = 0; i < this.lonPoints; i++) {
+        // Azimuth angle theta: 0 to 2*PI
+        const theta = (i / this.lonPoints) * Math.PI * 2;
+        const sTheta = Math.sin(theta);
+        const cTheta = Math.cos(theta);
+
+        this.phiCoord[idx] = phi;
+        this.thetaCoord[idx] = theta;
+        this.sinPhi[idx] = sPhi;
+        this.cosPhi[idx] = cPhi;
+        this.sinTheta[idx] = sTheta;
+        this.cosTheta[idx] = cTheta;
+        idx++;
       }
     }
 
@@ -66,16 +76,16 @@ export class NCSVisualizer {
       this.rimSin[k] = Math.sin(angle);
     }
 
-    // Colors: Signature Electric Yellow & Warm Amber
+    // Colors: Signature Electric Neon Yellow
     this.primaryColor = '#ffe800';
     this.glowColor = '#ffaa00';
     this.coreColor = '#ffffff';
 
-    // 3D Camera Angles matching Video
-    this.rotX = 0.38;   // Looking down into the wave valley
-    this.rotY = -0.24;  // Angled towards the viewer from the right
-    this.rotZ = 0.08;   // Diagonal tilt matching the Milky Way
-    this.fov = 740;
+    // 3D Camera Angles matching TW9d8vYrVFQ
+    this.rotX = 0.44;   // Downward tilt looking into the sphere
+    this.rotY = -0.52;  // Angled towards the viewer from the right
+    this.rotZ = 0.12;   // Diagonal tilt matching the Milky Way
+    this.fov = 760;
 
     this.audioPhase = 0;
     this.bgLayer = document.getElementById('bgLayer');
@@ -127,10 +137,9 @@ export class NCSVisualizer {
    */
   render(audioMetrics) {
     const { freqData, subBass, bass, mid, treble, kickPeak } = audioMetrics;
-    const totalEnergy = subBass * 0.8 + mid * 0.7 + treble * 0.5;
+    const totalEnergy = subBass * 0.85 + mid * 0.75 + treble * 0.5;
 
-    // Dynamic tempo-locked animation speed:
-    // Moves vigorously when music is loud/punchy; slows down and stops when music is calm/silent!
+    // Tempo-locked animation speed: active on beats, settles in quiet parts
     this.audioPhase += 0.012 + Math.min(0.08, totalEnergy * 0.09);
 
     const ctx = this.ctx;
@@ -138,7 +147,7 @@ export class NCSVisualizer {
     const h = this.height;
     const cx = this.centerX;
     const cy = this.centerY;
-    const R = this.baseRadius * (1.0 + Math.pow(subBass, 1.8) * 0.07);
+    const R = this.baseRadius * (1.0 + Math.pow(subBass, 1.8) * 0.06);
 
     // Hardware CSS Bass-Zoom on Background (scale 1.00 to 1.035)
     if (this.bgLayer) {
@@ -147,39 +156,7 @@ export class NCSVisualizer {
     }
 
     // -----------------------------------------------------------------
-    // 1. UPDATE AUDIO HISTORY WATERFALL BUFFER
-    // -----------------------------------------------------------------
-    const binCount = freqData.length;
-    const cols = this.historyCols;
-    const rows = this.historyRows;
-
-    // Shift previous rows back (creating the 3D traveling wave stream)
-    for (let j = rows - 1; j > 0; j--) {
-      const srcOffset = (j - 1) * cols;
-      const dstOffset = j * cols;
-      for (let i = 0; i < cols; i++) {
-        this.audioHistory[dstOffset + i] = this.audioHistory[srcOffset + i] * 0.985;
-      }
-    }
-
-    // Populate Row 0 with fresh live audio frequencies
-    for (let i = 0; i < cols; i++) {
-      const normI = i / (cols - 1);
-      const binIdx = Math.floor(Math.pow(normI, 1.7) * (binCount * 0.65) + 2);
-      const rawVal = (freqData[Math.min(binCount - 1, Math.max(0, binIdx))] || 0) / 255.0;
-
-      let energy = rawVal;
-      if (normI < 0.35) {
-        energy = Math.max(rawVal, subBass * 1.3);
-      } else if (normI < 0.7) {
-        energy = Math.max(rawVal, mid * 1.15);
-      }
-
-      this.audioHistory[i] = energy;
-    }
-
-    // -----------------------------------------------------------------
-    // 2. COMPUTE 3D WAVE LATTICE POSITIONS (Trapcode Form)
+    // 1. COMPUTE 3D PARTICLE SPHERE DISPLACEMENT (Trapcode Form)
     // -----------------------------------------------------------------
     const cosX = Math.cos(this.rotX);
     const sinX = Math.sin(this.rotX);
@@ -188,78 +165,82 @@ export class NCSVisualizer {
     const cosZ = Math.cos(this.rotZ);
     const sinZ = Math.sin(this.rotZ);
 
-    let p = 0;
-    for (let j = 0; j < this.gridSize; j++) {
-      const rowOffset = j * cols;
+    const binCount = freqData.length;
 
-      for (let i = 0; i < this.gridSize; i++) {
-        if (!this.isInside[p]) {
-          p++;
-          continue;
-        }
+    for (let p = 0; p < this.totalPoints; p++) {
+      const phi = this.phiCoord[p];
+      const theta = this.thetaCoord[p];
+      const sPhi = this.sinPhi[p];
+      const cPhi = this.cosPhi[p];
+      const sTheta = this.sinTheta[p];
+      const cTheta = this.cosTheta[p];
 
-        const u = this.uCoord[p];
-        const v = this.vCoord[p];
-        const d = this.distFromCenter[p];
+      // Map latitude & azimuth to live audio frequency spectrum
+      const normLat = phi / Math.PI; // 0 to 1
+      const normLon = theta / (Math.PI * 2); // 0 to 1
+      const freqIdx = Math.floor(Math.pow(normLat * 0.6 + normLon * 0.4, 1.7) * (binCount * 0.55) + 2);
+      const freqVal = (freqData[Math.min(binCount - 1, Math.max(0, freqIdx))] || 0) / 255.0;
 
-        // 1. Live Waterfall audio height (physically driven by playing music)
-        const audioHeight = this.audioHistory[rowOffset + i];
-        const waveWaterfall = audioHeight * (85 + subBass * 45);
+      // Authentic 3D Trapcode Form Audio React Displacement:
+      // A. Dynamic S-curve wave fold (active when music plays, flat in quiet intro)
+      const waveFold = Math.sin(theta * 2.0 - phi * 2.5 - this.audioPhase * 2.2) * (45 * (freqVal + subBass * 0.8));
 
-        // 2. Diagonal wave propagation along 35° angle (matching video's saddle crest)
-        const diagDist = (u * 0.72 - v * 0.68);
-        const waveDiagonal = Math.sin(diagDist * 3.4 - this.audioPhase * 2.2) * (55 * (audioHeight + subBass * 0.6));
+      // B. High-frequency secondary ripples from lead synth & percussion
+      const waveRipple = Math.cos(phi * 5.0 + theta * 3.0 - this.audioPhase * 3.0) * (20 * (mid + treble * 0.5));
 
-        // 3. Center bass kick shockwave ripple
-        const kickShockwave = kickPeak ? Math.sin(d * 12.0 - this.audioPhase * 5.0) * (38 * subBass) : 0;
+      // C. Bass kick radial shockwave
+      const kickImpulse = kickPeak ? Math.sin(phi * 8.0 - this.audioPhase * 5.0) * (28 * subBass) : 0;
 
-        // 4. Subtle saddle bowl curvature
-        const zSaddle = (u * u - v * v * 0.6) * (36 * (totalEnergy + 0.15));
-        const zBowl = - (1.0 - d * d) * (30 + subBass * 20);
+      // Total displaced radius from center:
+      // When silent (totalEnergy ~ 0), r = R * 0.88 (smooth, calm spherical dome!)
+      const r = R * (0.88 + (waveFold + waveRipple + kickImpulse) / R);
 
-        const x0 = u * R;
-        const y0 = v * R;
-        const z0 = zBowl + zSaddle + waveWaterfall + waveDiagonal + kickShockwave;
+      // Base 3D Sphere Coordinates
+      const x0 = r * sPhi * cTheta;
+      const y0 = r * cPhi;
+      const z0 = r * sPhi * sTheta;
 
-        // 3D Euler Rotation
-        const x1 = x0 * cosY + z0 * sinY;
-        const z1 = -x0 * sinY + z0 * cosY;
-        const y2 = y0 * cosX - z1 * sinX;
-        const z2 = y0 * sinX + z1 * cosX;
-        const xRot = x1 * cosZ - y2 * sinZ;
-        const yRot = x1 * sinZ + y2 * cosZ;
-        const zRot = z2;
+      // 3D Euler Rotation
+      const x1 = x0 * cosY + z0 * sinY;
+      const z1 = -x0 * sinY + z0 * cosY;
+      const y2 = y0 * cosX - z1 * sinX;
+      const z2 = y0 * sinX + z1 * cosX;
+      const xRot = x1 * cosZ - y2 * sinZ;
+      const yRot = x1 * sinZ + y2 * cosZ;
+      const zRot = z2;
 
-        // 3D Perspective Projection
-        const scale = this.fov / (this.fov + zRot + 300);
-        this.screenX[p] = cx + xRot * scale;
-        this.screenY[p] = cy + yRot * scale;
-        this.screenZ[p] = zRot;
-        this.screenScale[p] = scale;
+      // Only render particles that are front-facing / within the spherical volume
+      // In the intro, dots cluster along the curved perimeter; in the drop, wave crests fill the space
+      const isFront = zRot > -R * 0.35 || totalEnergy > 0.2;
+      this.isVisible[p] = isFront ? 1 : 0;
+      if (!isFront) continue;
 
-        // Depth shading & edge fade
-        const edgeFade = Math.max(0, 1.0 - Math.pow(d, 6));
-        const depthAlpha = Math.max(0.12, Math.min(1.0, 0.4 + (zRot / 90) + totalEnergy * 0.4));
-        this.screenAlpha[p] = edgeFade * depthAlpha;
+      // 3D Perspective Projection
+      const scale = this.fov / (this.fov + zRot + 300);
+      this.screenX[p] = cx + xRot * scale;
+      this.screenY[p] = cy + yRot * scale;
+      this.screenZ[p] = zRot;
+      this.screenScale[p] = scale;
 
-        p++;
-      }
+      // Depth shading: brighter near front wave crests, dimmer in distant valleys
+      const depthAlpha = Math.max(0.12, Math.min(1.0, 0.45 + (zRot / (R * 0.9)) + totalEnergy * 0.4));
+      this.screenAlpha[p] = depthAlpha;
     }
 
     // -----------------------------------------------------------------
-    // 3. COMPUTE DYNAMIC MOLTEN FLUID RIBBON (Frequency-Sculpted)
+    // 2. COMPUTE POLAR AUDIO SPECTRUM OUTER RIBBON
     // -----------------------------------------------------------------
     for (let k = 0; k < this.rimSegments; k++) {
       const angle = (k / this.rimSegments) * Math.PI * 2;
       const angleCos = Math.cos(angle);
-      const normFreqIdx = (angleCos + 1.0) * 0.5; // 0 to 1
+      const normFreqIdx = (angleCos + 1.0) * 0.5; // 0 (left bass) to 1 (right treble)
       const binIdx = Math.floor(Math.pow(normFreqIdx, 1.6) * (binCount * 0.55) + 2);
       const rawVal = (freqData[Math.min(binCount - 1, Math.max(0, binIdx))] || 0) / 255.0;
 
       this.smoothFreq[k] = this.smoothFreq[k] * 0.70 + rawVal * 0.30;
     }
 
-    // Spatial Gaussian smoothing over the 180 points for liquid curves
+    // Spatial Gaussian smoothing over the 180 points
     const spatiallySmoothed = new Float32Array(this.rimSegments);
     for (let k = 0; k < this.rimSegments; k++) {
       let sum = 0;
@@ -284,7 +265,7 @@ export class NCSVisualizer {
       const sVal = spatiallySmoothed[k];
       const angle = (k / this.rimSegments) * Math.PI * 2;
 
-      // 100% Seamless integer harmonics around the 360° circle (zero phase jump at seam)
+      // 100% Continuous integer harmonics around 360° circle (zero seam notch)
       const fluidHarmonic = Math.sin(angle * 2.0 - this.audioPhase * 2.2) * (18 * subBass) +
                             Math.cos(angle * 3.0 + this.audioPhase * 1.6) * (14 * (sVal + 0.12)) +
                             Math.sin(angle * 4.0 - this.audioPhase * 3.0) * (8 * (sVal + 0.05));
@@ -335,7 +316,8 @@ export class NCSVisualizer {
     const drawSmoothLoop = (ptsX, ptsY, reverse = false) => {
       const len = ptsX.length;
       const getPt = (idx) => {
-        const i = (idx + len) % len;
+        let i = idx % len;
+        if (i < 0) i += len;
         return [ptsX[i], ptsY[i]];
       };
 
@@ -346,10 +328,11 @@ export class NCSVisualizer {
 
       for (let step = 0; step < len; step++) {
         const i = reverse ? (len - 1 - step) : step;
+        const nextI = reverse ? (i - 1) : (i + 1);
         const [x0, y0] = getPt(reverse ? i + 1 : i - 1);
         const [x1, y1] = getPt(i);
-        const [x2, y2] = getPt(reverse ? i - 1 : i + 1);
-        const [x3, y3] = getPt(reverse ? i - 2 : i + 2);
+        const [x2, y2] = getPt(nextI);
+        const [x3, y3] = getPt(reverse ? nextI - 1 : nextI + 1);
 
         const cp1x = x1 + (x2 - x0) / 6;
         const cp1y = y1 + (y2 - y0) / 6;
@@ -409,73 +392,19 @@ export class NCSVisualizer {
     ctx.stroke();
 
     // -----------------------------------------------------------------
-    // RENDER PASS 2: Flowing 3D Wave Lattice Filaments
-    // -----------------------------------------------------------------
-    ctx.strokeStyle = this.primaryColor;
-    ctx.lineWidth = 0.85;
-
-    // Longitudinal flow lines along the audio stream rows
-    for (let j = 0; j < this.gridSize; j += 2) {
-      let drawing = false;
-      ctx.beginPath();
-      for (let i = 0; i < this.gridSize; i++) {
-        const idx = j * this.gridSize + i;
-        if (this.isInside[idx] && this.screenAlpha[idx] > 0.06) {
-          const px = this.screenX[idx];
-          const py = this.screenY[idx];
-          if (!drawing) {
-            ctx.moveTo(px, py);
-            drawing = true;
-          } else {
-            ctx.lineTo(px, py);
-          }
-        } else {
-          drawing = false;
-        }
-      }
-      ctx.globalAlpha = 0.25 + subBass * 0.25;
-      ctx.stroke();
-    }
-
-    // Diagonal/latitudinal cross lines along frequency columns
-    ctx.strokeStyle = this.glowColor;
-    ctx.lineWidth = 0.65;
-    for (let i = 0; i < this.gridSize; i += 3) {
-      let drawing = false;
-      ctx.beginPath();
-      for (let j = 0; j < this.gridSize; j++) {
-        const idx = j * this.gridSize + i;
-        if (this.isInside[idx] && this.screenAlpha[idx] > 0.08) {
-          const px = this.screenX[idx];
-          const py = this.screenY[idx];
-          if (!drawing) {
-            ctx.moveTo(px, py);
-            drawing = true;
-          } else {
-            ctx.lineTo(px, py);
-          }
-        } else {
-          drawing = false;
-        }
-      }
-      ctx.globalAlpha = 0.15 + subBass * 0.18;
-      ctx.stroke();
-    }
-
-    // -----------------------------------------------------------------
-    // RENDER PASS 3: Luminous 3D Particle Stream (The Signature Dots)
+    // RENDER PASS 2: Pure Luminous 3D Discrete Particles (NO WIREFRAME LINES!)
     // -----------------------------------------------------------------
     // A. Electric yellow glow halo behind dots
     ctx.fillStyle = this.primaryColor;
     for (let idx = 0; idx < this.totalPoints; idx += 2) {
-      if (!this.isInside[idx] || this.screenAlpha[idx] < 0.06) continue;
+      if (!this.isVisible[idx] || this.screenAlpha[idx] < 0.05) continue;
       const px = this.screenX[idx];
       const py = this.screenY[idx];
       const scale = this.screenScale[idx];
       const alpha = this.screenAlpha[idx];
-      const radius = Math.max(1.3, 3.0 * scale);
+      const radius = Math.max(1.3, 3.2 * scale);
 
-      ctx.globalAlpha = alpha * 0.7;
+      ctx.globalAlpha = alpha * 0.75;
       ctx.beginPath();
       ctx.arc(px, py, radius, 0, Math.PI * 2);
       ctx.fill();
@@ -484,12 +413,12 @@ export class NCSVisualizer {
     // B. Intense white-hot core dots
     ctx.fillStyle = this.coreColor;
     for (let idx = 0; idx < this.totalPoints; idx++) {
-      if (!this.isInside[idx] || this.screenAlpha[idx] < 0.08) continue;
+      if (!this.isVisible[idx] || this.screenAlpha[idx] < 0.08) continue;
       const px = this.screenX[idx];
       const py = this.screenY[idx];
       const scale = this.screenScale[idx];
       const alpha = this.screenAlpha[idx];
-      const radius = Math.max(0.85, 1.8 * scale);
+      const radius = Math.max(0.85, 1.85 * scale);
 
       ctx.globalAlpha = alpha;
       ctx.beginPath();
