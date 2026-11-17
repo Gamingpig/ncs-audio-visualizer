@@ -4,15 +4,15 @@
  * "Elektronomia - Sky High | NCS" (TW9d8vYrVFQ)
  *
  * Mathematically verified against 1080p60 frame captures:
- * 1. Trapcode Form 3D S-Curve Wave Sheet (110 x 110 = 12,100 discrete dots):
- *    - Tilted 3D plane rotated in perspective (RotX ~55°, RotY ~-20°, RotZ ~17°).
- *    - Central S-curve spine: ridge = exp(-((u - spineU)^2) / 0.08) * R * audio.
+ * 1. Trapcode Form 3D S-Curve Wave Sheet (130 x 130 = 16,900 discrete dots):
+ *    - Full-span tilted 3D plane rotated in perspective (RotX ~55°, RotY ~-18°, RotZ ~16°).
+ *    - Central S-curve spine: ridge = exp(-((u - spineU)^2) / 0.10) * R * audio.
  *    - Waves undulate dynamically across the silk surface in sync with bass and lead synths.
  *    - Perspective compression naturally generates the bright caustic filaments (NO WIREFRAME LINES!).
- *    - In quiet passages (intro 0:15): sheet rests softly along lower curve, center is deep dark space.
- *    - In drop (1:05, 1:12): central S-curve wave erupts into full crests and valleys.
+ *    - Transparent interior: cosmic starry desert background remains visible through particles.
  * 2. Authentic After Effects Polar Audio Spectrum:
  *    - Solid glowing fluid yellow ribbon with 240 inward analog frequency bars.
+ *    - Mathematically C1-smooth seamless 360° circular closure (zero notch).
  *    - White-hot perimeter rim circle with breathing bass pulse.
  * 3. Exact Screen Layout:
  *    - Visualizer circle positioned on the right (68% X, 46% Y) matching desert monolith composition.
@@ -22,26 +22,22 @@ export class NCSVisualizer {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: true });
 
-    // Trapcode Form Grid Parameters (110 x 110 = 12,100 points)
-    this.gridU = 110;
-    this.gridV = 110;
+    // Trapcode Form Grid Parameters (130 x 130 = 16,900 points)
+    this.gridU = 130;
+    this.gridV = 130;
     this.totalPoints = this.gridU * this.gridV;
 
-    // Precalculate UV planar coordinates from -1.10 to +1.10
+    // Precalculate UV planar coordinates from -1.60 to +1.60 (covers full circle span)
     this.uCoord = new Float32Array(this.totalPoints);
     this.vCoord = new Float32Array(this.totalPoints);
-    this.radialFeather = new Float32Array(this.totalPoints);
 
     let idx = 0;
     for (let j = 0; j < this.gridV; j++) {
-      const v = (j / (this.gridV - 1) - 0.5) * 2.20;
+      const v = (j / (this.gridV - 1) - 0.5) * 3.20;
       for (let i = 0; i < this.gridU; i++) {
-        const u = (i / (this.gridU - 1) - 0.5) * 2.20;
-        const dSq = u * u + v * v;
+        const u = (i / (this.gridU - 1) - 0.5) * 3.20;
         this.uCoord[idx] = u;
         this.vCoord[idx] = v;
-        // Organic radial feathering (eliminates straight grid boundary edges)
-        this.radialFeather[idx] = Math.max(0.0, Math.min(1.0, 1.0 - (dSq - 0.50) / 0.70));
         idx++;
       }
     }
@@ -73,9 +69,9 @@ export class NCSVisualizer {
 
     // 3D Camera Angles matching TW9d8vYrVFQ perspective
     this.rotX = 0.95;   // ~55° downward pitch
-    this.rotY = -0.35;  // ~-20° yaw towards desert monolith
-    this.rotZ = 0.30;   // ~17° roll along Milky Way diagonal
-    this.fov = 780;
+    this.rotY = -0.32;  // ~-18° yaw towards desert monolith
+    this.rotZ = 0.28;   // ~16° roll along Milky Way diagonal
+    this.fov = 760;
 
     this.audioPhase = 0;
     this.bgLayer = document.getElementById('bgLayer');
@@ -162,30 +158,24 @@ export class NCSVisualizer {
     const R_sq = R * R;
 
     for (let p = 0; p < this.totalPoints; p++) {
-      const rf = this.radialFeather[p];
-      if (rf <= 0.01) {
-        this.isVisible[p] = 0;
-        continue;
-      }
-
       const u = this.uCoord[p];
       const v = this.vCoord[p];
       const d = Math.sqrt(u * u + v * v);
 
       // Frequency mapping across the sheet
-      const freqIdx = Math.floor(Math.min(1.0, (d * 0.5 + 0.15)) * (binCount * 0.5) + 2);
+      const freqIdx = Math.floor(Math.min(1.0, (d * 0.4 + 0.15)) * (binCount * 0.5) + 2);
       const freqVal = (freqData[Math.min(binCount - 1, Math.max(0, freqIdx))] || 0) / 255.0;
 
-      // Base coordinates in 3D:
-      const x0 = (u * 1.05 + Math.sin(v * 2.2) * 0.15) * R;
+      // Base coordinates in 3D (Full-span planar surface):
+      const x0 = (u * 1.05 + Math.sin(v * 2.2) * 0.14) * R;
       const y0 = (v * 1.00 - Math.cos(u * 1.8) * 0.12) * R;
 
-      // Central S-curve spine & audio displacement (verified against actual video crop):
-      const spineU = 0.28 * Math.sin(v * 2.6 - this.audioPhase * 1.8);
+      // Central S-curve spine & audio displacement:
+      const spineU = 0.32 * Math.sin(v * 2.5 - this.audioPhase * 1.8);
       const uDiff = u - spineU;
-      const ridge = Math.exp(-(uDiff * uDiff) / 0.08) * R * (0.08 + subBass * 0.55 + freqVal * 0.25);
-      const wave1 = Math.sin(2.8 * u - 2.0 * v - this.audioPhase * 2.4) * R * (0.03 + subBass * 0.22);
-      const wave2 = Math.cos(4.5 * u + 3.0 * v - this.audioPhase * 3.0) * R * (0.02 + mid * 0.12);
+      const ridge = Math.exp(-(uDiff * uDiff) / 0.10) * R * (0.08 + subBass * 0.62 + freqVal * 0.24);
+      const wave1 = Math.sin(2.6 * u - 1.8 * v - this.audioPhase * 2.4) * R * (0.03 + subBass * 0.25);
+      const wave2 = Math.cos(4.2 * u + 2.8 * v - this.audioPhase * 3.0) * R * (0.02 + mid * 0.14);
       const kickImp = kickPeak ? Math.sin(d * 8.0 - this.audioPhase * 6.0) * (R * 0.20) * subBass : 0;
       const z0 = ridge + wave1 + wave2 + kickImp;
 
@@ -224,9 +214,9 @@ export class NCSVisualizer {
       const edgeFade = Math.min(1.0, Math.max(0.0, (R - dist) / 10.0));
 
       // Depth shading: wave crests facing viewer are brighter
-      const heightFactor = Math.max(0.0, Math.min(1.0, 0.40 + (zRot / (R * 0.8))));
+      const heightFactor = Math.max(0.0, Math.min(1.0, 0.40 + (zRot / (R * 0.85))));
       const introFade = 0.20 + totalEnergy * 0.80;
-      this.screenAlpha[p] = rf * edgeFade * (heightFactor * 0.85 + 0.15) * introFade;
+      this.screenAlpha[p] = edgeFade * (heightFactor * 0.85 + 0.15) * introFade;
     }
 
     // -----------------------------------------------------------------
@@ -287,13 +277,13 @@ export class NCSVisualizer {
     ctx.clearRect(0, 0, w, h);
 
     // -----------------------------------------------------------------
-    // RENDER PASS 1: High-Contrast Cosmic Interior & Outer Neon Aura
+    // RENDER PASS 1: Subtle Vignette & Outer Neon Aura (Transparent to Stars)
     // -----------------------------------------------------------------
-    // A. Soft dark core inside circle for vibrant particle contrast
+    // A. Soft subtle vignette (transparent so starry sky shines through)
     const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-    coreGrad.addColorStop(0.00, 'rgba(3, 4, 10, 0.88)');
-    coreGrad.addColorStop(0.75, 'rgba(5, 7, 16, 0.75)');
-    coreGrad.addColorStop(1.00, 'rgba(8, 10, 22, 0.10)');
+    coreGrad.addColorStop(0.00, 'rgba(2, 4, 10, 0.25)');
+    coreGrad.addColorStop(0.70, 'rgba(3, 6, 14, 0.40)');
+    coreGrad.addColorStop(1.00, 'rgba(5, 8, 20, 0.05)');
     ctx.fillStyle = coreGrad;
     ctx.beginPath();
     ctx.arc(cx, cy, R, 0, Math.PI * 2);
@@ -324,7 +314,7 @@ export class NCSVisualizer {
       const py = this.screenY[idx];
       const scale = this.screenScale[idx];
       const alpha = this.screenAlpha[idx];
-      const radius = Math.max(1.1, 2.3 * scale);
+      const radius = Math.max(1.1, 2.2 * scale);
 
       ctx.globalAlpha = alpha * 0.70;
       ctx.beginPath();
@@ -340,7 +330,7 @@ export class NCSVisualizer {
       const py = this.screenY[idx];
       const scale = this.screenScale[idx];
       const alpha = this.screenAlpha[idx];
-      const radius = Math.max(0.65, 1.35 * scale);
+      const radius = Math.max(0.65, 1.25 * scale);
 
       ctx.globalAlpha = alpha * 0.95;
       ctx.beginPath();
