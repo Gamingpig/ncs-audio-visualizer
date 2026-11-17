@@ -1,433 +1,66 @@
 /**
- * 3D Particle Wave Sheet & Polar Audio Spectrum Visualizer
- * Exact 1:1 Trapcode Form & After Effects Audio Spectrum Recreation of
- * "Elektronomia - Sky High | NCS" (TW9d8vYrVFQ)
- *
- * Mathematically verified against 1080p60 frame captures:
- * 1. Trapcode Form 3D S-Curve Wave Sheet (130 x 130 = 16,900 discrete dots):
- *    - Full-span tilted 3D plane rotated in perspective (RotX ~55°, RotY ~-18°, RotZ ~16°).
- *    - Central S-curve spine: ridge = exp(-((u - spineU)^2) / 0.10) * R * audio.
- *    - Waves undulate dynamically across the silk surface in sync with bass and lead synths.
- *    - Perspective compression naturally generates the bright caustic filaments (NO WIREFRAME LINES!).
- *    - Transparent interior: cosmic starry desert background remains visible through particles.
- * 2. Authentic After Effects Polar Audio Spectrum:
- *    - Solid glowing fluid yellow ribbon with 240 inward analog frequency bars.
- *    - Mathematically C1-smooth seamless 360° circular closure (zero notch).
- *    - White-hot perimeter rim circle with breathing bass pulse.
- * 3. Exact Screen Layout:
- *    - Visualizer circle positioned on the right (68% X, 46% Y) matching desert monolith composition.
+ * NCS Sky High Visualizer v7.1 (Full Bloom Pipeline)
  */
 export class NCSVisualizer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: true });
-
-    // Trapcode Form Grid Parameters (130 x 130 = 16,900 points)
-    this.gridU = 130;
-    this.gridV = 130;
-    this.totalPoints = this.gridU * this.gridV;
-
-    // Precalculate UV planar coordinates from -1.60 to +1.60 (covers full circle span)
-    this.uCoord = new Float32Array(this.totalPoints);
-    this.vCoord = new Float32Array(this.totalPoints);
-
-    let idx = 0;
-    for (let j = 0; j < this.gridV; j++) {
-      const v = (j / (this.gridV - 1) - 0.5) * 3.20;
-      for (let i = 0; i < this.gridU; i++) {
-        const u = (i / (this.gridU - 1) - 0.5) * 3.20;
-        this.uCoord[idx] = u;
-        this.vCoord[idx] = v;
-        idx++;
-      }
-    }
-
-    // Output projection buffers
-    this.screenX = new Float32Array(this.totalPoints);
-    this.screenY = new Float32Array(this.totalPoints);
-    this.screenZ = new Float32Array(this.totalPoints);
-    this.screenScale = new Float32Array(this.totalPoints);
-    this.screenAlpha = new Float32Array(this.totalPoints);
-    this.isVisible = new Uint8Array(this.totalPoints);
-
-    // Audio Spectrum Polar Rim Parameters (240 analog frequency bars)
-    this.rimSegments = 240;
-    this.rimCos = new Float32Array(this.rimSegments);
-    this.rimSin = new Float32Array(this.rimSegments);
-    this.smoothFreq = new Float32Array(this.rimSegments);
-
-    for (let k = 0; k < this.rimSegments; k++) {
-      const angle = (k / this.rimSegments) * Math.PI * 2;
-      this.rimCos[k] = Math.cos(angle);
-      this.rimSin[k] = Math.sin(angle);
-    }
-
-    // Color Palette: Dynamic based on Theme
+    this.bloomCanvas = document.createElement('canvas');
+    this.bloomCtx = this.bloomCanvas.getContext('2d', { alpha: true });
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.primaryColor = '#ffe800';
     this.glowColor = '#ffbb00';
     this.coreColor = '#ffffff';
-
-    // 3D Camera Angles matching TW9d8vYrVFQ perspective
-    this.rotX = 0.95;   // ~55° downward pitch
-    this.rotY = -0.32;  // ~-18° yaw towards desert monolith
-    this.rotZ = 0.28;   // ~16° roll along Milky Way diagonal
-    this.fov = 760;
-
-    this.audioPhase = 0;
-    this.bgLayer = document.getElementById('bgLayer');
-
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.resize();
     window.addEventListener('resize', () => this.resize());
-  }
-
-  setTheme(color, glow) {
-    this.primaryColor = color;
-    this.glowColor = glow;
-  }
-
-  setCoverArt() {}
-  setDefaultLogo() {}
-  setBackgroundArt(url) {
-    if (this.bgLayer) {
-      this.bgLayer.style.backgroundImage = url ? `url("${url}")` : "url('assets/bg.jpg')";
-    }
+    this.resize();
   }
 
   resize() {
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-    this.width = window.innerWidth;
-    this.height = window.innerHeight;
-
-    this.canvas.width = Math.floor(this.width * this.dpr);
-    this.canvas.height = Math.floor(this.height * this.dpr);
-    this.canvas.style.width = `${this.width}px`;
-    this.canvas.style.height = `${this.height}px`;
-
-    this.ctx.scale(this.dpr, this.dpr);
-
-    // 1:1 Video Placement: Right ~68% X, 46% Y on landscape viewports
-    const isLandscape = this.width >= 768 && (this.width / this.height) >= 1.15;
-    if (isLandscape) {
-      this.centerX = this.width * 0.68;
-      this.centerY = this.height * 0.46;
-      this.baseRadius = Math.min(this.width * 0.22, this.height * 0.34);
-    } else {
-      this.centerX = this.width * 0.50;
-      this.centerY = this.height * 0.56;
-      this.baseRadius = Math.min(this.width * 0.38, this.height * 0.24);
-    }
+    this.canvas.width = this.bloomCanvas.width = window.innerWidth * this.dpr;
+    this.canvas.height = this.bloomCanvas.height = window.innerHeight * this.dpr;
   }
 
-  /**
-   * Main Render Frame
-   */
-  render(audioMetrics) {
-    const { freqData, subBass, bass, mid, treble, kickPeak } = audioMetrics;
-    const totalEnergy = subBass * 0.85 + mid * 0.75 + treble * 0.5;
+  setTheme(color, glow) { this.primaryColor = color; this.glowColor = glow; }
 
-    // Tempo-locked animation speed: active on music beats, calm during quiet parts
-    this.audioPhase += 0.010 + Math.min(0.08, totalEnergy * 0.08);
-
+  render(audio) {
+    const { subBass, freqData } = audio;
     const ctx = this.ctx;
-    const w = this.width;
-    const h = this.height;
-    const cx = this.centerX;
-    const cy = this.centerY;
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const cx = w/2; const cy = h/2;
+    const R = Math.min(w, h) * 0.3;
 
-    // Authentic NCS Bass-Kick Radial Breathing
-    const R = this.baseRadius * (1.0 + Math.pow(subBass, 1.8) * 0.075);
-
-    // Hardware CSS Bass-Zoom on Background (scale 1.00 to 1.035)
-    if (this.bgLayer) {
-      const zoom = 1.0 + Math.pow(subBass, 1.6) * 0.035;
-      this.bgLayer.style.transform = `scale(${zoom})`;
-    }
-
-    // -----------------------------------------------------------------
-    // 1. COMPUTE 3D PARTICLE SHEET DISPLACEMENT (Trapcode Form)
-    // -----------------------------------------------------------------
-    const cosX = Math.cos(this.rotX);
-    const sinX = Math.sin(this.rotX);
-    const cosY = Math.cos(this.rotY);
-    const sinY = Math.sin(this.rotY);
-    const cosZ = Math.cos(this.rotZ);
-    const sinZ = Math.sin(this.rotZ);
-
-    const binCount = freqData.length;
-    const R_sq = R * R;
-
-    for (let p = 0; p < this.totalPoints; p++) {
-      const u = this.uCoord[p];
-      const v = this.vCoord[p];
-      const d = Math.sqrt(u * u + v * v);
-
-      // Frequency mapping across the sheet
-      const freqIdx = Math.floor(Math.min(1.0, (d * 0.4 + 0.15)) * (binCount * 0.5) + 2);
-      const freqVal = (freqData[Math.min(binCount - 1, Math.max(0, freqIdx))] || 0) / 255.0;
-
-      // Base coordinates in 3D (Full-span planar surface):
-      const x0 = (u * 1.05 + Math.sin(v * 2.2) * 0.14) * R;
-      const y0 = (v * 1.00 - Math.cos(u * 1.8) * 0.12) * R;
-
-      // Central S-curve spine & audio displacement with Snappy Elastic Response
-      const turb = Math.sin(u * 2.0 + this.audioPhase * 0.5) * Math.cos(v * 2.0 - this.audioPhase * 0.5);
-      const spineU = 0.32 * Math.sin(v * 2.5 - this.audioPhase * 1.8);
-      const uDiff = u - spineU;
-      
-      // Elastic Envelope: Sharp reaction to kickPeak, smooth decay for synths
-      const snap = kickPeak ? 1.5 : 1.0;
-      const ridge = Math.exp(-(uDiff * uDiff) / 0.10) * R * (0.08 + subBass * 0.62 * snap + freqVal * 0.24);
-      const wave = turb * (R * 0.15 * (1 + subBass * snap));
-      const z0 = ridge + wave;
-
-      // 3D Euler Transformation (Yaw -> Pitch -> Roll)
-      const x1 = x0 * cosY + z0 * sinY;
-      const z1 = -x0 * sinY + z0 * cosY;
-      const y2 = y0 * cosX - z1 * sinX;
-      const z2 = y0 * sinX + z1 * cosX;
-      const xRot = x1 * cosZ - y2 * sinZ;
-      const yRot = x1 * sinZ + y2 * cosZ;
-      const zRot = z2;
-
-      // Perspective Projection
-      const scale = this.fov / (this.fov + zRot + 300);
-      const px = cx + xRot * scale;
-      const py = cy + yRot * scale;
-
-      // Circular Masking: Only particles inside the circular aperture
-      const dx = px - cx;
-      const dy = py - cy;
-      const distSq = dx * dx + dy * dy;
-
-      if (distSq >= R_sq) {
-        this.isVisible[p] = 0;
-        continue;
-      }
-
-      this.isVisible[p] = 1;
-      this.screenX[p] = px;
-      this.screenY[p] = py;
-      this.screenZ[p] = zRot;
-      this.screenScale[p] = scale;
-
-      // Soft feathering near the outer rim
-      const dist = Math.sqrt(distSq);
-      const edgeFade = Math.min(1.0, Math.max(0.0, (R - dist) / 10.0));
-
-      // Depth shading: wave crests facing viewer are brighter
-      const heightFactor = Math.max(0.0, Math.min(1.0, 0.40 + (zRot / (R * 0.85))));
-      const introFade = 0.20 + totalEnergy * 0.80;
-      this.screenAlpha[p] = edgeFade * (heightFactor * 0.85 + 0.15) * introFade;
-    }
-
-    // -----------------------------------------------------------------
-    // 2. COMPUTE POLAR AUDIO SPECTRUM (Authentic After Effects Spectrum)
-    // -----------------------------------------------------------------
-    for (let k = 0; k < this.rimSegments; k++) {
-      const angle = (k / this.rimSegments) * Math.PI * 2;
-      // Mathematically C1-smooth continuous mapping across 0 and 2*PI (zero seam notch)
-      const freqNorm = 0.5 - 0.5 * Math.cos(angle);
-      const binIdx = Math.floor(Math.pow(freqNorm, 1.4) * (binCount * 0.55) + 2);
-      const rawVal = (freqData[Math.min(binCount - 1, Math.max(0, binIdx))] || 0) / 255.0;
-
-      this.smoothFreq[k] = this.smoothFreq[k] * 0.65 + rawVal * 0.35;
-    }
-
-    // Spatial smoothing over neighboring bars
-    const smoothedBars = new Float32Array(this.rimSegments);
-    for (let k = 0; k < this.rimSegments; k++) {
-      let sum = 0;
-      let count = 0;
-      for (let offset = -3; offset <= 3; offset++) {
-        const neighbor = (k + offset + this.rimSegments) % this.rimSegments;
-        const weight = 4 - Math.abs(offset);
-        sum += this.smoothFreq[neighbor] * weight;
-        count += weight;
-      }
-      smoothedBars[k] = sum / count;
-    }
-
-    const outerPtsX = new Float32Array(this.rimSegments);
-    const outerPtsY = new Float32Array(this.rimSegments);
-    const innerPtsX = new Float32Array(this.rimSegments);
-    const innerPtsY = new Float32Array(this.rimSegments);
-
-    for (let k = 0; k < this.rimSegments; k++) {
-      const cosA = this.rimCos[k];
-      const sinA = this.rimSin[k];
-      const sVal = smoothedBars[k];
-      const angle = (k / this.rimSegments) * Math.PI * 2;
-
-      // Continuous harmonic undulating fluid wave around 360°
-      const waveHarmonic = Math.sin(angle * 2.0 - this.audioPhase * 2.2) * (14 * subBass) +
-                           Math.cos(angle * 3.0 + this.audioPhase * 1.8) * (10 * (sVal + 0.1));
-
-      // Bar height inward from perimeter R
-      const barHeight = 22 + (sVal * 78) + (subBass * 42) + waveHarmonic;
-      const rInner = Math.max(R * 0.54, R - barHeight);
-
-      outerPtsX[k] = cx + cosA * R;
-      outerPtsY[k] = cy + sinA * R;
-      innerPtsX[k] = cx + cosA * rInner;
-      innerPtsY[k] = cy + sinA * rInner;
-    }
-
-    // -----------------------------------------------------------------
-    // 3. CANVAS RENDER PASSES
-    // -----------------------------------------------------------------
     ctx.clearRect(0, 0, w, h);
+    this.bloomCtx.clearRect(0, 0, w, h);
 
-    // -----------------------------------------------------------------
-    // RENDER PASS 1: Subtle Vignette & Outer Neon Aura (Transparent to Stars)
-    // -----------------------------------------------------------------
-    // A. Transparent cosmic center: Remove opaque fill (Render Pass 1, part A)
-    // Removed coreGrad.addColorStop(0.00, 'rgba(2, 4, 10, 0.25)'); 
-    // Allowing the starry bgLayer to shine through completely.
-    ctx.clearRect(cx - R, cy - R, R * 2, R * 2);
-
-    // B. Atmospheric yellow bloom radiating outward into starry desert night
-    const bloomGrad = ctx.createRadialGradient(cx, cy, R * 0.90, cx, cy, R * 1.45);
-    const bloomAlpha = 0.12 + Math.pow(subBass, 1.5) * 0.28;
-    bloomGrad.addColorStop(0.00, `rgba(255, 232, 0, ${bloomAlpha})`);
-    bloomGrad.addColorStop(0.50, `rgba(255, 187, 0, ${bloomAlpha * 0.45})`);
-    bloomGrad.addColorStop(1.00, 'rgba(255, 170, 0, 0)');
-    ctx.fillStyle = bloomGrad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, R * 1.45, 0, Math.PI * 2);
-    ctx.fill();
-
-    // -----------------------------------------------------------------
-    // RENDER PASS 2: Pure Luminous 3D Discrete Particles (NO WIREFRAME LINES!)
-    // -----------------------------------------------------------------
-    ctx.save();
+    // 1. Render Spectrum (Additive Bars)
     ctx.globalCompositeOperation = 'lighter';
+    this.bloomCtx.globalCompositeOperation = 'lighter';
+    
+    for (let k = 0; k < 240; k++) {
+      const angle = (k / 240) * Math.PI * 2;
+      const freq = freqData[Math.floor((k/240)*freqData.length)] / 255;
+      const hBar = 30 + freq * 150 + subBass * 50;
+      
+      const x1 = cx + Math.cos(angle) * R;
+      const y1 = cy + Math.sin(angle) * R;
+      const x2 = cx + Math.cos(angle) * (R - hBar);
+      const y2 = cy + Math.sin(angle) * (R - hBar);
 
-    // A. Electric yellow glow halos
-    ctx.fillStyle = this.primaryColor;
-    for (let idx = 0; idx < this.totalPoints; idx += 2) {
-      if (!this.isVisible[idx] || this.screenAlpha[idx] < 0.04) continue;
-      const px = this.screenX[idx];
-      const py = this.screenY[idx];
-      const scale = this.screenScale[idx];
-      const alpha = this.screenAlpha[idx];
-      const radius = Math.max(1.1, 2.2 * scale);
-
-      ctx.globalAlpha = alpha * 0.70;
-      ctx.beginPath();
-      ctx.arc(px, py, radius, 0, Math.PI * 2);
-      ctx.fill();
+      // Draw to Main
+      ctx.strokeStyle = this.primaryColor;
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      
+      // Draw to Bloom
+      this.bloomCtx.strokeStyle = this.glowColor;
+      this.bloomCtx.lineWidth = 8;
+      this.bloomCtx.beginPath(); this.bloomCtx.moveTo(x1, y1); this.bloomCtx.lineTo(x2, y2); this.bloomCtx.stroke();
     }
 
-    // B. Intense white-hot core dots
-    ctx.fillStyle = this.coreColor;
-    for (let idx = 0; idx < this.totalPoints; idx++) {
-      if (!this.isVisible[idx] || this.screenAlpha[idx] < 0.07) continue;
-      const px = this.screenX[idx];
-      const py = this.screenY[idx];
-      const scale = this.screenScale[idx];
-      const alpha = this.screenAlpha[idx];
-      const radius = Math.max(0.65, 1.25 * scale);
-
-      ctx.globalAlpha = alpha * 0.95;
-      ctx.beginPath();
-      ctx.arc(px, py, radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.restore();
-
-    // -----------------------------------------------------------------
-    // RENDER PASS 3: Authentic Polar Audio Spectrum Ribbon (Solid Glow + Striations)
-    // -----------------------------------------------------------------
-    // Smooth Catmull-Rom loop helper
-    const drawSmoothLoop = (ptsX, ptsY, reverse = false) => {
-      const len = ptsX.length;
-      const getPt = (idx) => {
-        let i = idx % len;
-        if (i < 0) i += len;
-        return [ptsX[i], ptsY[i]];
-      };
-
-      for (let step = 0; step < len; step++) {
-        const i = reverse ? (len - 1 - step) : step;
-        const nextI = reverse ? (i - 1) : (i + 1);
-        const [x0, y0] = getPt(reverse ? i + 1 : i - 1);
-        const [x1, y1] = getPt(i);
-        const [x2, y2] = getPt(nextI);
-        const [x3, y3] = getPt(reverse ? nextI - 1 : nextI + 1);
-
-        const cp1x = x1 + (x2 - x0) / 6;
-        const cp1y = y1 + (y2 - y0) / 6;
-        const cp2x = x2 - (x3 - x1) / 6;
-        const cp2y = y2 - (y3 - y1) / 6;
-
-        if (step === 0 && !reverse) {
-          ctx.moveTo(x1, y1);
-        } else if (step === 0 && reverse) {
-          ctx.lineTo(x1, y1);
-        }
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
-      }
-    };
-
-    // A. Solid Glowing Fluid Molten Ribbon Body
-    ctx.save();
-    ctx.beginPath();
-    drawSmoothLoop(outerPtsX, outerPtsY, false);
-    drawSmoothLoop(innerPtsX, innerPtsY, true);
-    ctx.closePath();
-
-    const ribbonGrad = ctx.createRadialGradient(cx, cy, R * 0.40, cx, cy, R);
-    ribbonGrad.addColorStop(0.00, this.glowColor + 'A0');
-    ribbonGrad.addColorStop(0.60, this.primaryColor + 'E0');
-    ribbonGrad.addColorStop(1.00, '#ffffff');
-    ctx.fillStyle = ribbonGrad;
-    ctx.globalAlpha = 0.95;
-    ctx.fill();
-
-    // B. 240 Radial Analog Spectrum Striations (The authentic After Effects Audio Spectrum texture)
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = this.primaryColor;
-    ctx.lineWidth = 1.2;
-    ctx.globalAlpha = 0.55 + subBass * 0.40;
-
-    ctx.beginPath();
-    for (let k = 0; k < this.rimSegments; k++) {
-      ctx.moveTo(outerPtsX[k], outerPtsY[k]);
-      ctx.lineTo(innerPtsX[k], innerPtsY[k]);
-    }
-    ctx.stroke();
-
-    // C. Inner contour white highlight
-    ctx.strokeStyle = this.coreColor;
-    ctx.lineWidth = 1.5;
-    ctx.globalAlpha = 0.85;
-    ctx.beginPath();
-    drawSmoothLoop(innerPtsX, innerPtsY, false);
-    ctx.stroke();
-
-    ctx.restore();
-
-    // -----------------------------------------------------------------
-    // RENDER PASS 4: Crisp Outer White-Hot Neon Perimeter
-    // -----------------------------------------------------------------
-    ctx.save();
-    ctx.strokeStyle = this.primaryColor;
-    ctx.lineWidth = 5.0;
-    ctx.shadowColor = this.primaryColor;
-    ctx.shadowBlur = 18;
-    ctx.beginPath();
-    ctx.arc(cx, cy, R, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Crisp inner core line
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2.0;
-    ctx.shadowBlur = 0;
-    ctx.beginPath();
-    ctx.arc(cx, cy, R, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+    // 2. Draw Bloom Pass
+    ctx.filter = 'blur(10px)';
+    ctx.drawImage(this.bloomCanvas, 0, 0);
+    ctx.filter = 'none';
   }
 }
