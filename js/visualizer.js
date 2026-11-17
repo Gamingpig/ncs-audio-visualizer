@@ -234,8 +234,9 @@ export class NCSVisualizer {
     // -----------------------------------------------------------------
     for (let k = 0; k < this.rimSegments; k++) {
       const angle = (k / this.rimSegments) * Math.PI * 2;
-      const freqNorm = Math.abs(Math.sin(angle * 0.5));
-      const binIdx = Math.floor(Math.pow(freqNorm, 1.5) * (binCount * 0.55) + 2);
+      // Mathematically C1-smooth continuous mapping across 0 and 2*PI (zero seam notch)
+      const freqNorm = 0.5 - 0.5 * Math.cos(angle);
+      const binIdx = Math.floor(Math.pow(freqNorm, 1.4) * (binCount * 0.55) + 2);
       const rawVal = (freqData[Math.min(binCount - 1, Math.max(0, binIdx))] || 0) / 255.0;
 
       this.smoothFreq[k] = this.smoothFreq[k] * 0.65 + rawVal * 0.35;
@@ -376,6 +377,8 @@ export class NCSVisualizer {
 
         if (step === 0 && !reverse) {
           ctx.moveTo(x1, y1);
+        } else if (step === 0 && reverse) {
+          ctx.lineTo(x1, y1);
         }
         ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
       }
