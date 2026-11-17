@@ -2,26 +2,27 @@
  * 3D Particle Wave Lattice & Fluid Molten Ribbon Visualizer
  * Exact 1:1 recreation of "Elektronomia - Sky High" (Trapcode Form Audio React):
  *
- * 1. 100% Audio-Reactive Physics: The 3D particle mesh is NOT a canned sine loop!
- *    It is an Audio Waterfall & Dynamic Membrane driven directly by the live frequency spectrum.
- *    When quiet, the mesh is calm and still; when the beat drops, it erupts into 3D waves.
- * 2. Perceptual Frequency Mapping: Bass kicks displace the center/left, lead synths
- *    vibrate the mid-range ridges, and percussion shimmers across the high frequencies.
- * 3. Reactive Molten Fluid Ribbon: The outer ribbon's thickness and contour deform
- *    dynamically based on the real-time frequency distribution around the circle.
- * 4. Catmull-Rom Cubic Bezier Splines: 100% silky smooth liquid contours with zero jagged edges.
- * 5. Additive Neon Bloom ('lighter'): Intense electric yellow (#ffe800) and golden amber (#ffaa00).
+ * 1. 100% Dynamic Audio-Reactive Physics:
+ *    - Animation speed (`audioPhase`) is directly locked to live musical energy.
+ *    - Wave displacement is sculpted by the live frequency spectrum & audio waterfall.
+ *    - In silent passages, the mesh completely rests; when the drop hits, it erupts into 3D waves.
+ * 2. Diagonal Wave Propagation: Waves travel along the 35° perspective diagonal matching
+ *    the Milky Way and the original After Effects template camera.
+ * 3. Organic Molten Fluid Ribbon: Swells into rich liquid golden folds during bass kicks
+ *    and flutters with lead synth vibrato, rendered via smooth Catmull-Rom cubic splines.
+ * 4. High-Contrast Cosmic Core & Atmospheric Bloom: Soft dark interior for brilliant dot contrast
+ *    and glowing yellow volumetric aura radiating into space.
  */
 export class NCSVisualizer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d', { alpha: true });
 
-    // 3D Grid Parameters (72 x 72 = 5,184 points)
-    this.gridSize = 72;
+    // 3D Grid Parameters (76 x 76 = 5,776 points)
+    this.gridSize = 76;
     this.totalPoints = this.gridSize * this.gridSize;
 
-    // Audio Waterfall History Buffer: 72 time steps x 72 frequency channels
+    // Audio Waterfall History Buffer
     this.historyRows = this.gridSize;
     this.historyCols = this.gridSize;
     this.audioHistory = new Float32Array(this.historyRows * this.historyCols);
@@ -65,18 +66,18 @@ export class NCSVisualizer {
       this.rimSin[k] = Math.sin(angle);
     }
 
-    // Colors: Elektronomia Signature Electric Neon Yellow
+    // Colors: Signature Electric Yellow & Warm Amber
     this.primaryColor = '#ffe800';
     this.glowColor = '#ffaa00';
     this.coreColor = '#ffffff';
 
     // 3D Camera Angles matching Video
-    this.rotX = 0.38;   // Looking down into the rolling wave surface
-    this.rotY = -0.25;  // Angled towards the viewer from the right
+    this.rotX = 0.38;   // Looking down into the wave valley
+    this.rotY = -0.24;  // Angled towards the viewer from the right
     this.rotZ = 0.08;   // Diagonal tilt matching the Milky Way
-    this.fov = 720;
+    this.fov = 740;
 
-    this.time = 0;
+    this.audioPhase = 0;
     this.bgLayer = document.getElementById('bgLayer');
 
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -126,14 +127,18 @@ export class NCSVisualizer {
    */
   render(audioMetrics) {
     const { freqData, subBass, bass, mid, treble, kickPeak } = audioMetrics;
-    this.time += 0.035;
+    const totalEnergy = subBass * 0.8 + mid * 0.7 + treble * 0.5;
+
+    // Dynamic tempo-locked animation speed:
+    // Moves vigorously when music is loud/punchy; slows down and stops when music is calm/silent!
+    this.audioPhase += 0.012 + Math.min(0.08, totalEnergy * 0.09);
 
     const ctx = this.ctx;
     const w = this.width;
     const h = this.height;
     const cx = this.centerX;
     const cy = this.centerY;
-    const R = this.baseRadius * (1.0 + Math.pow(subBass, 1.8) * 0.06);
+    const R = this.baseRadius * (1.0 + Math.pow(subBass, 1.8) * 0.07);
 
     // Hardware CSS Bass-Zoom on Background (scale 1.00 to 1.035)
     if (this.bgLayer) {
@@ -142,35 +147,32 @@ export class NCSVisualizer {
     }
 
     // -----------------------------------------------------------------
-    // 1. UPDATE AUDIO HISTORY WATERFALL BUFFER (Pure Dynamic Audio)
+    // 1. UPDATE AUDIO HISTORY WATERFALL BUFFER
     // -----------------------------------------------------------------
     const binCount = freqData.length;
     const cols = this.historyCols;
     const rows = this.historyRows;
 
-    // Shift previous rows back by 1 (creating the flowing 3D wave stream)
+    // Shift previous rows back (creating the 3D traveling wave stream)
     for (let j = rows - 1; j > 0; j--) {
       const srcOffset = (j - 1) * cols;
       const dstOffset = j * cols;
       for (let i = 0; i < cols; i++) {
-        this.audioHistory[dstOffset + i] = this.audioHistory[srcOffset + i] * 0.985; // subtle decay
+        this.audioHistory[dstOffset + i] = this.audioHistory[srcOffset + i] * 0.985;
       }
     }
 
-    // Populate Row 0 with fresh live audio frequencies using perceptual scaling
-    // Logarithmic distribution: bass in left cols, mids in center, treble in right cols
+    // Populate Row 0 with fresh live audio frequencies
     for (let i = 0; i < cols; i++) {
-      const normI = i / (cols - 1); // 0 to 1
-      // Perceptual exponential curve for natural musical frequency representation
-      const binIdx = Math.floor(Math.pow(normI, 1.8) * (binCount * 0.7) + 2);
+      const normI = i / (cols - 1);
+      const binIdx = Math.floor(Math.pow(normI, 1.7) * (binCount * 0.65) + 2);
       const rawVal = (freqData[Math.min(binCount - 1, Math.max(0, binIdx))] || 0) / 255.0;
 
-      // Add kick energy punch to bass columns (cols 0 - 24)
       let energy = rawVal;
       if (normI < 0.35) {
-        energy = Math.max(rawVal, subBass * 1.25);
+        energy = Math.max(rawVal, subBass * 1.3);
       } else if (normI < 0.7) {
-        energy = Math.max(rawVal, mid * 1.1);
+        energy = Math.max(rawVal, mid * 1.15);
       }
 
       this.audioHistory[i] = energy;
@@ -200,26 +202,24 @@ export class NCSVisualizer {
         const v = this.vCoord[p];
         const d = this.distFromCenter[p];
 
-        // Read audio height directly from the live audio waterfall buffer
+        // 1. Live Waterfall audio height (physically driven by playing music)
         const audioHeight = this.audioHistory[rowOffset + i];
+        const waveWaterfall = audioHeight * (85 + subBass * 45);
 
-        // Dynamic 3D Wave Physics:
-        // 1. Live waterfall height (displaces in direct proportion to playing notes)
-        const waveAudio = audioHeight * (80 + subBass * 40);
+        // 2. Diagonal wave propagation along 35° angle (matching video's saddle crest)
+        const diagDist = (u * 0.72 - v * 0.68);
+        const waveDiagonal = Math.sin(diagDist * 3.4 - this.audioPhase * 2.2) * (55 * (audioHeight + subBass * 0.6));
 
-        // 2. Center bass kick impact shockwave (expands radially outward on kicks)
-        const kickShockwave = kickPeak ? Math.sin(d * 12.0 - this.time * 6.0) * (35 * subBass) : 0;
+        // 3. Center bass kick shockwave ripple
+        const kickShockwave = kickPeak ? Math.sin(d * 12.0 - this.audioPhase * 5.0) * (38 * subBass) : 0;
 
-        // 3. Ambient gentle breathing (only present when audio is playing, completely flat when silent)
-        const totalEnergy = subBass + mid + treble;
-        const subtleBreathing = totalEnergy > 0.05 ? Math.sin(u * 2.2 + v * 1.6 - this.time * 2.0) * (20 * totalEnergy) : 0;
-
-        // 4. Spherical bowl curvature
-        const zBowl = - (1.0 - d * d) * (28 + subBass * 20);
+        // 4. Subtle saddle bowl curvature
+        const zSaddle = (u * u - v * v * 0.6) * (36 * (totalEnergy + 0.15));
+        const zBowl = - (1.0 - d * d) * (30 + subBass * 20);
 
         const x0 = u * R;
         const y0 = v * R;
-        const z0 = zBowl + waveAudio + kickShockwave + subtleBreathing;
+        const z0 = zBowl + zSaddle + waveWaterfall + waveDiagonal + kickShockwave;
 
         // 3D Euler Rotation
         const x1 = x0 * cosY + z0 * sinY;
@@ -247,32 +247,26 @@ export class NCSVisualizer {
     }
 
     // -----------------------------------------------------------------
-    // 3. COMPUTE DYNAMIC MOLTEN FLUID RIBBON (Frequency-Mapped)
+    // 3. COMPUTE DYNAMIC MOLTEN FLUID RIBBON (Frequency-Sculpted)
     // -----------------------------------------------------------------
-    // Map the 180 perimeter angles to live frequency bands:
-    // Left side (~PI): Bass / Kick
-    // Top (~PI/2) & Bottom (~3PI/2): Mids / Synths / Vocals
-    // Right side (~0): Treble / Percussion / Hi-hats
     for (let k = 0; k < this.rimSegments; k++) {
       const angle = (k / this.rimSegments) * Math.PI * 2;
-      // Perceptual angle mapping
-      const angleCos = Math.cos(angle); // -1 (left = bass) to +1 (right = treble)
+      const angleCos = Math.cos(angle);
       const normFreqIdx = (angleCos + 1.0) * 0.5; // 0 to 1
-      const binIdx = Math.floor(Math.pow(normFreqIdx, 1.6) * (binCount * 0.6) + 2);
+      const binIdx = Math.floor(Math.pow(normFreqIdx, 1.6) * (binCount * 0.55) + 2);
       const rawVal = (freqData[Math.min(binCount - 1, Math.max(0, binIdx))] || 0) / 255.0;
 
-      // Smooth temporal decay
-      this.smoothFreq[k] = this.smoothFreq[k] * 0.72 + rawVal * 0.28;
+      this.smoothFreq[k] = this.smoothFreq[k] * 0.70 + rawVal * 0.30;
     }
 
-    // Spatial Gaussian smoothing over the 180 points for perfectly silky curves
+    // Spatial Gaussian smoothing over the 180 points for liquid curves
     const spatiallySmoothed = new Float32Array(this.rimSegments);
     for (let k = 0; k < this.rimSegments; k++) {
       let sum = 0;
       let count = 0;
-      for (let offset = -5; offset <= 5; offset++) {
+      for (let offset = -4; offset <= 4; offset++) {
         const neighbor = (k + offset + this.rimSegments) % this.rimSegments;
-        const weight = 6 - Math.abs(offset);
+        const weight = 5 - Math.abs(offset);
         sum += this.smoothFreq[neighbor] * weight;
         count += weight;
       }
@@ -290,11 +284,13 @@ export class NCSVisualizer {
       const sVal = spatiallySmoothed[k];
 
       // Dynamic reactive thickness:
-      // When audio plays, each angle deforms according to that frequency!
-      // When silent, settles into a calm, smooth 18px glowing circular band.
-      const rOuter = R + (sVal * 10) + (subBass * 10);
-      const thickness = 18 + (sVal * 68) + (subBass * 32);
-      const rInner = Math.max(R * 0.55, rOuter - thickness);
+      // Organic harmonic undulation scaled directly by live music energy
+      const fluidHarmonic = Math.sin(k * 0.22 - this.audioPhase * 2.5) * (18 * subBass) +
+                            Math.cos(k * 0.38 + this.audioPhase * 1.8) * (12 * (sVal + 0.1));
+
+      const rOuter = R + (sVal * 12) + (subBass * 12);
+      const thickness = 20 + (sVal * 80) + (subBass * 42) + fluidHarmonic;
+      const rInner = Math.max(R * 0.52, rOuter - thickness);
 
       outerPtsX[k] = cx + cosA * rOuter;
       outerPtsY[k] = cy + sinA * rOuter;
@@ -440,7 +436,7 @@ export class NCSVisualizer {
       ctx.stroke();
     }
 
-    // Latitudinal lines along frequency columns
+    // Diagonal/latitudinal cross lines along frequency columns
     ctx.strokeStyle = this.glowColor;
     ctx.lineWidth = 0.65;
     for (let i = 0; i < this.gridSize; i += 3) {
