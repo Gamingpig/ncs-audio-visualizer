@@ -170,14 +170,13 @@ export class NCSVisualizer {
       const x0 = (u * 1.05 + Math.sin(v * 2.2) * 0.14) * R;
       const y0 = (v * 1.00 - Math.cos(u * 1.8) * 0.12) * R;
 
-      // Central S-curve spine & audio displacement:
+      // Central S-curve spine & audio displacement with Turbulent Noise
+      const turb = Math.sin(u * 2.0 + this.audioPhase * 0.5) * Math.cos(v * 2.0 - this.audioPhase * 0.5);
       const spineU = 0.32 * Math.sin(v * 2.5 - this.audioPhase * 1.8);
       const uDiff = u - spineU;
       const ridge = Math.exp(-(uDiff * uDiff) / 0.10) * R * (0.08 + subBass * 0.62 + freqVal * 0.24);
-      const wave1 = Math.sin(2.6 * u - 1.8 * v - this.audioPhase * 2.4) * R * (0.03 + subBass * 0.25);
-      const wave2 = Math.cos(4.2 * u + 2.8 * v - this.audioPhase * 3.0) * R * (0.02 + mid * 0.14);
-      const kickImp = kickPeak ? Math.sin(d * 8.0 - this.audioPhase * 6.0) * (R * 0.20) * subBass : 0;
-      const z0 = ridge + wave1 + wave2 + kickImp;
+      const wave = turb * (R * 0.15 * (1 + subBass));
+      const z0 = ridge + wave + (kickPeak ? Math.sin(d * 8.0 - this.audioPhase * 6.0) * (R * 0.20) * subBass : 0);
 
       // 3D Euler Transformation (Yaw -> Pitch -> Roll)
       const x1 = x0 * cosY + z0 * sinY;
