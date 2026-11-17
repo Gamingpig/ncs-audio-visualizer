@@ -62,7 +62,7 @@ export class NCSVisualizer {
       this.rimSin[k] = Math.sin(angle);
     }
 
-    // Color Palette: Authentic Electric Neon Yellow
+    // Color Palette: Dynamic based on Theme
     this.primaryColor = '#ffe800';
     this.glowColor = '#ffbb00';
     this.coreColor = '#ffffff';
@@ -381,19 +381,19 @@ export class NCSVisualizer {
     drawSmoothLoop(innerPtsX, innerPtsY, true);
     ctx.closePath();
 
-    const ribbonGrad = ctx.createRadialGradient(cx, cy, R * 0.50, cx, cy, R);
-    ribbonGrad.addColorStop(0.00, 'rgba(255, 232, 0, 0.60)');
-    ribbonGrad.addColorStop(0.70, 'rgba(255, 220, 0, 0.90)');
-    ribbonGrad.addColorStop(1.00, 'rgba(255, 248, 140, 1.00)');
+    const ribbonGrad = ctx.createRadialGradient(cx, cy, R * 0.40, cx, cy, R);
+    ribbonGrad.addColorStop(0.00, this.glowColor + 'A0');
+    ribbonGrad.addColorStop(0.60, this.primaryColor + 'E0');
+    ribbonGrad.addColorStop(1.00, '#ffffff');
     ctx.fillStyle = ribbonGrad;
-    ctx.globalAlpha = 0.92;
+    ctx.globalAlpha = 0.95;
     ctx.fill();
 
     // B. 240 Radial Analog Spectrum Striations (The authentic After Effects Audio Spectrum texture)
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = this.coreColor;
-    ctx.lineWidth = 1.8;
-    ctx.globalAlpha = 0.35 + subBass * 0.40;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = this.primaryColor;
+    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.55 + subBass * 0.40;
 
     ctx.beginPath();
     for (let k = 0; k < this.rimSegments; k++) {
